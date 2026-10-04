@@ -1,0 +1,22 @@
+{
+  "name": "NavLife — маршрут, привычки и тренировка мозга",
+  "short_name": "NavLife",
+  "description": "Осознанный день: дела, привычки, питание, сон, тренировки мозга.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#EDEFEA",
+  "theme_color": "#EDEFEA",
+  "lang": "ru",
+  "dir": "ltr",
+  "categories": ["productivity", "health", "lifestyle"],
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Тренировка мозга", "short_name": "Мозг", "url": "./index.html", "icons": [{ "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml" }] },
+    { "name": "Привычки", "short_name": "Привычки", "url": "./index.html", "icons": [{ "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml" }] }
+  ]
+}

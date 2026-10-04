@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#EDEFEA">
+<title>NavLife — маршрут, привычки и тренировка мозга</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/skin.css">
+<link rel="stylesheet" href="css/modules.css">
+
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="NavLife">
+<link rel="apple-touch-icon" href="icon.svg">
+<meta name="format-detection" content="telephone=no">
+</head>
+<body>
+
+<div id="app">
+  <main id="screens"></main>
+  <nav id="nav" class="nav hidden">
+    <button class="nav-btn" data-nav="today"><span class="ni">🏠</span><span class="nl">Дом</span></button>
+    <button class="nav-btn" data-nav="schedule"><span class="ni">📅</span><span class="nl">Дела</span></button>
+    <button class="nav-btn" data-nav="habits"><span class="ni">✅</span><span class="nl">Прив.</span></button>
+    <button class="nav-btn" data-nav="nutrition"><span class="ni">🥗</span><span class="nl">Еда</span></button>
+    <button class="nav-btn" data-nav="brain"><span class="ni">🧠</span><span class="nl">Мозг</span></button>
+    <button class="nav-btn" data-nav="stats"><span class="ni">📊</span><span class="nl">Прогр.</span></button>
+    <button class="nav-btn" data-nav="profile"><span class="ni">👤</span><span class="nl">Профиль</span></button>
+  </nav>
+</div>
+
+<div id="modal-root" class="modal-root"></div>
+<div id="flash" class="flash"></div>
+<div id="toast" class="toast"></div>
+
+<script src="js/01-core.js"></script>
+<script src="js/02-home.js"></script>
+<script src="js/03-schedule.js"></script>
+<script src="js/04-nutrition.js"></script>
+<script src="js/05-brain.js"></script>
+<script src="js/06-goals.js"></script>
+<script src="js/07-onboarding.js"></script>
+<script src="js/08-stats.js"></script>
+<script src="js/09-profile.js"></script>
+<script src="js/10-habits.js"></script>
+<script src="js/11-sleep.js"></script>
+<script src="js/12-mood.js"></script>
+<script src="js/13-reflection.js"></script>
+<script src="js/14-achievements.js"></script>
+<script src="js/15-freezer.js"></script>
+<script src="js/16-feature-pack.js"></script>
+<script src="js/17-init.js"></script>
+</body>
+</html>
