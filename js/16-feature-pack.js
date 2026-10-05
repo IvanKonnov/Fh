@@ -1,7 +1,8 @@
-/* ═══ NAVLIFE · FEATURE PACK ═══ */
+/* ═══ NAVLIFE · FEATURE PACK · v3.5 ═══ */
 (function(){
 'use strict';
 const N = window.__nav;
+if (!N){ console.error('[FEATURE-PACK] __nav not found'); return; }
 const { go, saveState, toast, openModal, closeModal, todayKey, fmtDate, esc, toMin, nutritionToday, SFX, buzz } = N;
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:'){
@@ -10,6 +11,7 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:'){
   });
 }
 
+/* ═══ Splash ═══ */
 (function splash(){
   const sp = document.createElement('div');
   sp.innerHTML = `
@@ -29,6 +31,7 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:'){
   }, 400);
 })();
 
+/* ═══ Notification permission ═══ */
 async function requestNotifPerm(){
   if (!('Notification' in window)) return false;
   if (Notification.permission === 'granted') return true;
@@ -40,34 +43,52 @@ async function requestNotifPerm(){
 }
 window.requestNotifPerm = requestNotifPerm;
 
+/* ═══ Уведомления с настраиваемыми интервалами ═══
+   Для каждого незавершённого события проверяем:
+   прошло ли ровно N минут до старта (где N из S.shared.notificationLeadTimes).
+   Ключ дедупликации: eventId + leadMinutes, чтобы каждый интервал стрелял 1 раз.
+*/
 function tickNotifications(){
   if (!N.S.shared.notifications) return;
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
   const ds = todayKey();
   const now = new Date();
   const nowMin = now.getHours() * 60 + now.getMinutes();
+  const leadTimes = N.S.shared.notificationLeadTimes || [1,5];
+
   N.S.navlife.schedule
     .filter(i => i.date === ds && !i.completed)
     .forEach(it => {
       const start = toMin(it.startTime);
       const diff = start - nowMin;
-      if (diff >= 0 && diff <= 1){
-        N.S.meta.notifShown = N.S.meta.notifShown || {};
-        if (N.S.meta.notifShown[it.id]) return;
-        N.S.meta.notifShown[it.id] = Date.now();
-        saveState();
-        try {
-          new Notification('NavLife · Сейчас', {
-            body: `Сейчас ${it.startTime} — ${it.title}`,
-            icon: 'icon.svg',
-            tag: it.id
-          });
-        } catch(e){}
-      }
+
+      // Проверяем каждый интервал
+      leadTimes.forEach(lead => {
+        // Окно ±1 минута, чтобы точно сработать
+        if (diff === lead){
+          const key = `${it.id}|${lead}`;
+          N.S.meta.notifShown = N.S.meta.notifShown || {};
+          if (N.S.meta.notifShown[key]) return;
+          N.S.meta.notifShown[key] = Date.now();
+          saveState();
+          try {
+            const timeLabel = lead === 1 ? 'через минуту'
+                           : lead === 60 ? 'через час'
+                           : `через ${lead} мин`;
+            new Notification(`NavLife · ${timeLabel}`, {
+              body: `${it.startTime} — ${it.title}`,
+              icon: 'icon.svg',
+              tag: key
+            });
+          } catch(e){}
+        }
+      });
     });
 }
-setInterval(tickNotifications, 45000);
+setInterval(tickNotifications, 30000);
 
+/* ═══ Защита от пропусков ═══ */
 function checkMissedDays(){
   const S = N.S;
   const today = todayKey();
@@ -99,6 +120,7 @@ function openWelcomeBack(days){
   });
 }
 
+/* ═══ Итог дня ═══ */
 function checkEndOfDay(force){
   const S = N.S;
   const ds = todayKey();

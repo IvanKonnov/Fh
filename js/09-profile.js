@@ -1,14 +1,17 @@
-/* ═══ NAVLIFE · PROFILE ═══ */
+/* ═══ NAVLIFE · PROFILE · v3.5 ═══ */
 (function(){
 'use strict';
 const N = window.__nav;
+if (!N){ console.error('[PROFILE] __nav not found'); return; }
 const { go, saveState, esc, levelInfo, applyTheme, toast, openModal, closeModal,
         SFX, buzz, todayKey, resetState, avatarHtml } = N;
 const AVATARS = ['🧠','🚀','🦉','🐺','🦊','🐙','🌟','⚡','🎯','🧩','🦁','🐬'];
+const LEAD_TIME_OPTIONS = [1, 5, 10, 15, 30];
 
 function renderProfile(){
   const S = N.S;
   const li = levelInfo(S.neurofit.xp);
+  const leadTimes = S.shared.notificationLeadTimes || [1,5];
   const root = document.createElement('div');
   root.className = 'screen';
   root.innerHTML = `
@@ -69,10 +72,36 @@ function renderProfile(){
         <div><div class="h3">Вибрация</div></div>
         <div class="switch ${S.shared.haptics?'on':''}" data-toggle="haptics"></div>
       </div>
-      <div class="between" style="padding:12px 0;border-bottom:1px solid var(--line)">
-        <div><div class="h3">Уведомления</div><div class="muted" style="font-size:11.5px;margin-top:2px">За минуту до старта</div></div>
-        <div class="switch ${S.shared.notifications?'on':''}" id="notifSw"></div>
+
+      <div style="padding:12px 0;border-bottom:1px solid var(--line)">
+        <div class="between" style="margin-bottom:8px">
+          <div>
+            <div class="h3">Уведомления о событиях</div>
+            <div class="muted" style="font-size:11.5px;margin-top:2px">Напоминания за N минут до старта</div>
+          </div>
+          <div class="switch ${S.shared.notifications?'on':''}" id="notifSw"></div>
+        </div>
+
+        <div id="leadTimesBlock" style="display:${S.shared.notifications?'block':'none'};margin-top:10px">
+          <div class="tiny" style="margin-bottom:6px">НАПОМИНАТЬ ЗА</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            ${LEAD_TIME_OPTIONS.map(m => {
+              const on = leadTimes.includes(m);
+              return `<button type="button" data-lead="${m}" style="
+                padding:8px 14px;border-radius:100px;font-size:12.5px;font-weight:600;
+                background:${on ? 'var(--moss)' : 'var(--paper)'};
+                color:${on ? '#fff' : 'var(--ink-soft)'};
+                border:1px solid ${on ? 'var(--moss)' : 'var(--line)'};
+                cursor:pointer;transition:all .15s;
+              ">${on ? '✓ ' : ''}${m} мин</button>`;
+            }).join('')}
+          </div>
+          <p class="muted" style="font-size:11.5px;margin-top:8px">
+            Можно выбрать несколько — придёт несколько напоминаний.
+          </p>
+        </div>
       </div>
+
       <div style="padding:16px 0 4px">
         <div class="h3" style="margin-bottom:4px">Цель тренировок в день</div>
         <div class="muted" style="font-size:12.5px;margin-bottom:14px">Сколько раз тренировать мозг</div>
@@ -98,6 +127,7 @@ function renderProfile(){
     </div>
     <div style="height:20px"></div>`;
 
+  /* Тумблеры */
   root.querySelectorAll('[data-toggle]').forEach(sw => {
     sw.onclick = () => {
       const k = sw.dataset.toggle;
@@ -108,17 +138,39 @@ function renderProfile(){
   });
   root.querySelectorAll('[data-goal]').forEach(b => b.onclick = () => { S.shared.dailyGoal = +b.dataset.goal; saveState(); SFX.tap(); go('profile'); });
 
+  /* Уведомления */
   const notifSw = root.querySelector('#notifSw');
+  const leadBlock = root.querySelector('#leadTimesBlock');
   if (notifSw) notifSw.onclick = async () => {
     if (!S.shared.notifications){
       const ok = await (window.requestNotifPerm ? window.requestNotifPerm() : Promise.resolve(false));
       if (!ok){ toast('Разреши уведомления в браузере'); return; }
       S.shared.notifications = true;
-    } else S.shared.notifications = false;
+    } else {
+      S.shared.notifications = false;
+    }
     notifSw.classList.toggle('on', S.shared.notifications);
+    leadBlock.style.display = S.shared.notifications ? 'block' : 'none';
     saveState(); SFX.tap();
     toast(S.shared.notifications ? 'Уведомления включены' : 'Выключено');
   };
+
+  root.querySelectorAll('[data-lead]').forEach(b => b.onclick = () => {
+    const m = +b.dataset.lead;
+    let arr = S.shared.notificationLeadTimes || [1,5];
+    if (arr.includes(m)) arr = arr.filter(x => x !== m);
+    else arr.push(m);
+    arr.sort((a,b) => a-b);
+    S.shared.notificationLeadTimes = arr;
+    saveState(); SFX.tap();
+    b.style.background = arr.includes(m) ? 'var(--moss)' : 'var(--paper)';
+    b.style.color = arr.includes(m) ? '#fff' : 'var(--ink-soft)';
+    b.style.borderColor = arr.includes(m) ? 'var(--moss)' : 'var(--line)';
+    b.textContent = (arr.includes(m) ? '✓ ' : '') + m + ' мин';
+    // Пересоздаём кэш показанных уведомлений — чтобы не пропускало события
+    if (N.S.meta && N.S.meta.notifShown) N.S.meta.notifShown = {};
+    saveState();
+  });
 
   root.querySelector('#editName').onclick = openNameModal;
   root.querySelector('#openLevels').onclick = () => go('levels');
@@ -228,13 +280,13 @@ function openHelpModal(){
     <h3 style="font-size:14px;margin-bottom:8px;color:var(--moss)">😴 Сон</h3>
     <p class="muted" style="margin-bottom:14px">Записывай время сна и качество. Смотри корреляцию с настроением в Прогрессе.</p>
     <h3 style="font-size:14px;margin-bottom:8px;color:var(--moss)">🥗 Питание</h3>
-    <p class="muted" style="margin-bottom:14px">КБЖУ, вода, вес, дневник еды.</p>
+    <p class="muted" style="margin-bottom:14px">Авто-план по цели, БЖУ 30/25/45, бюджет, аллергии. Продукты с тегами полезности.</p>
     <h3 style="font-size:14px;margin-bottom:8px;color:var(--moss)">🧠 Мозг</h3>
     <p class="muted" style="margin-bottom:14px">19 упражнений, 3 режима, 6 уровней.</p>
+    <h3 style="font-size:14px;margin-bottom:8px;color:var(--moss)">🔔 Уведомления</h3>
+    <p class="muted" style="margin-bottom:14px">Настраивается в Профиле. Можно выбрать несколько интервалов одновременно.</p>
     <h3 style="font-size:14px;margin-bottom:8px;color:var(--moss)">🏆 Достижения</h3>
-    <p class="muted" style="margin-bottom:14px">30 бейджей. Разблокируются по событиям.</p>
-    <h3 style="font-size:14px;margin-bottom:8px;color:var(--moss)">❄️ Заморозка</h3>
-    <p class="muted" style="margin-bottom:16px">2 заморозки в месяц. Если пропустил день — серия не сбросится.</p>
+    <p class="muted" style="margin-bottom:14px">30+ бейджей. Разблокируются по событиям.</p>
     <button class="btn btn-primary btn-full btn-lg" id="hOk" type="button">Понятно</button>`, m => {
     m.querySelector('#hOk').onclick = () => closeModal(m);
   });

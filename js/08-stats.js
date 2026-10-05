@@ -1,10 +1,229 @@
-/* ═══ NAVLIFE · STATS ═══ */
+/* ═══ NAVLIFE · STATS · с анализом взаимосвязей ═══ */
 (function(){
 'use strict';
 const N = window.__nav;
-const { go, esc, todayKey, fmtDate, levelInfo, dowShort, nutritionToday, itemsForDate } = N;
+if (!N){ console.error('[STATS] __nav not found'); return; }
+const { go, esc, todayKey, fmtDate, levelInfo, dowShort, dowNames, nutritionToday, itemsForDate } = N;
 const CATS = { memory:{name:'Память',icon:'🧠'}, speed:{name:'Внимание',icon:'⚡'}, math:{name:'Счёт',icon:'🔢'}, logic:{name:'Логика',icon:'🧩'} };
 const MODES = { normal:{emoji:'📋'}, endless:{emoji:'♾️'}, survival:{emoji:'💀'} };
+
+/* ═══════════════════════════════════════════════════════════════════
+   АНАЛИЗ ВЗАИМОСВЯЗЕЙ
+   Ищем закономерности в накопленных данных.
+   Порог: минимум 3 точки в каждой группе, чтобы избежать случайных выводов.
+   Формулируем как НАБЛЮДЕНИЕ, не как причину.
+   ═══════════════════════════════════════════════════════════════════ */
+
+function avg(arr){ return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0; }
+
+/* Собрать данные за последние N дней в единый датасет */
+function collectDailyMetrics(daysBack = 30){
+  const S = N.S;
+  const out = [];
+  for (let i = 0; i < daysBack; i++){
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const ds = fmtDate(d);
+    const day = S.nutrition.days[ds];
+    let kcal = 0;
+    if (day && day.meals){
+      ['breakfast','lunch','dinner','snack'].forEach(m => {
+        (day.meals[m] || []).forEach(it => { kcal += (it.kcal || 0) * (it.grams || 0) / 100; });
+      });
+    }
+    const items = S.navlife.schedule.filter(x => x.date === ds);
+    const done = items.filter(x => x.completed).length;
+    const total = items.length;
+    const sessionsToday = S.neurofit.sessions.filter(s => s.d === ds);
+    const avgAccToday = sessionsToday.length ? avg(sessionsToday.map(s => s.acc)) : null;
+    const habitDone = (S.habits || []).filter(h => ((h.log||{})[ds] || 0) >= (h.target || 1)).length;
+    const habitTotal = (S.habits || []).length;
+
+    out.push({
+      ds,
+      dow: d.getDay(),
+      sleep: S.sleep[ds] ? S.sleep[ds].hours : null,
+      sleepQuality: S.sleep[ds] ? S.sleep[ds].quality : null,
+      mood: S.mood[ds] ? S.mood[ds].m : null,
+      energy: S.mood[ds] ? S.mood[ds].e : null,
+      water: day ? (day.water || 0) : 0,
+      kcal: Math.round(kcal),
+      scheduleDone: done,
+      scheduleTotal: total,
+      schedulePct: total ? Math.round(done/total*100) : null,
+      brainAcc: avgAccToday,
+      brainSessions: sessionsToday.length,
+      habitPct: habitTotal ? Math.round(habitDone/habitTotal*100) : null
+    });
+  }
+  return out;
+}
+
+/* 1. Сон → Настроение */
+function insightSleepMood(){
+  const data = collectDailyMetrics(30).filter(x => x.sleep !== null && x.mood !== null);
+  if (data.length < 6) return null;
+  const short = data.filter(x => x.sleep < 6.5).map(x => x.mood);
+  const mid   = data.filter(x => x.sleep >= 6.5 && x.sleep < 7.5).map(x => x.mood);
+  const long  = data.filter(x => x.sleep >= 7.5).map(x => x.mood);
+  if (short.length < 3 || long.length < 3) return null;
+  const aS = avg(short), aL = avg(long);
+  const diff = aL - aS;
+  if (Math.abs(diff) < 0.4) return null;
+  const direction = diff > 0 ? 'выше' : 'ниже';
+  const fill = (v) => v.toFixed(1);
+  return {
+    icon: '😴',
+    title: 'Сон и настроение',
+    text: `В дни, когда ты спал <b>≥ 7.5 ч</b>, настроение в среднем <b>${fill(aL)}</b> из 5. 
+           Когда <b>менее 6.5 ч</b> — <b>${fill(aS)}</b>. 
+           Настроение на <b>${Math.abs(diff).toFixed(1)}</b> ${direction}.
+           ${mid.length ? `При среднем сне — <b>${fill(avg(mid))}</b>.` : ''}
+           <span style="opacity:.7">Это наблюдение на твоих данных, а не доказанная причина.</span>`
+  };
+}
+
+/* 2. Сон → Продуктивность (дела) */
+function insightSleepProductivity(){
+  const data = collectDailyMetrics(30).filter(x => x.sleep !== null && x.schedulePct !== null && x.scheduleTotal >= 3);
+  if (data.length < 6) return null;
+  const short = data.filter(x => x.sleep < 6.5).map(x => x.schedulePct);
+  const long  = data.filter(x => x.sleep >= 7.5).map(x => x.schedulePct);
+  if (short.length < 3 || long.length < 3) return null;
+  const aS = avg(short), aL = avg(long);
+  const diff = aL - aS;
+  if (Math.abs(diff) < 8) return null;
+  const direction = diff > 0 ? 'больше' : 'меньше';
+  return {
+    icon: '📋',
+    title: 'Сон и дела',
+    text: `После сна <b>≥ 7.5 ч</b> ты выполняешь в среднем <b>${Math.round(aL)}%</b> дел, 
+           а после <b>< 6.5 ч</b> — <b>${Math.round(aS)}%</b>. 
+           Разница <b>${Math.round(Math.abs(diff))}%</b> в пользу ${direction === 'больше' ? 'хорошего сна' : 'короткого сна'}.
+           <span style="opacity:.7">Наблюдение на твоих данных.</span>`
+  };
+}
+
+/* 3. Настроение → Продуктивность */
+function insightMoodProductivity(){
+  const data = collectDailyMetrics(30).filter(x => x.mood !== null && x.schedulePct !== null && x.scheduleTotal >= 3);
+  if (data.length < 6) return null;
+  const low = data.filter(x => x.mood <= 2).map(x => x.schedulePct);
+  const high = data.filter(x => x.mood >= 4).map(x => x.schedulePct);
+  if (low.length < 3 || high.length < 3) return null;
+  const aL = avg(low), aH = avg(high);
+  const diff = aH - aL;
+  if (Math.abs(diff) < 10) return null;
+  return {
+    icon: '🙂',
+    title: 'Настроение и дела',
+    text: `В дни с настроением <b>😄 / 🤩</b> ты выполняешь <b>${Math.round(aH)}%</b> дел,
+           а в дни с <b>😞 / 😐</b> — <b>${Math.round(aL)}%</b>. 
+           Разница <b>${Math.round(Math.abs(diff))}%</b>.
+           <span style="opacity:.7">Это корреляция, не причина.</span>`
+  };
+}
+
+/* 4. Вода → Настроение */
+function insightWaterMood(){
+  const data = collectDailyMetrics(30).filter(x => x.water > 0 && x.mood !== null);
+  if (data.length < 6) return null;
+  const goal = N.S.nutrition.goals.water || 2000;
+  const low = data.filter(x => x.water < goal * 0.6).map(x => x.mood);
+  const high = data.filter(x => x.water >= goal * 0.9).map(x => x.mood);
+  if (low.length < 3 || high.length < 3) return null;
+  const aL = avg(low), aH = avg(high);
+  const diff = aH - aL;
+  if (Math.abs(diff) < 0.4) return null;
+  return {
+    icon: '💧',
+    title: 'Вода и настроение',
+    text: `Когда ты пьёшь <b>≥ ${Math.round(goal*0.9)} мл</b> воды, настроение в среднем <b>${aH.toFixed(1)}</b>.
+           Когда <b>< ${Math.round(goal*0.6)} мл</b> — <b>${aL.toFixed(1)}</b>. 
+           Разница <b>${Math.abs(diff).toFixed(1)}</b>.
+           <span style="opacity:.7">Наблюдение, не доказательство.</span>`
+  };
+}
+
+/* 5. Сон → Точность в упражнениях мозга */
+function insightSleepBrain(){
+  const data = collectDailyMetrics(30).filter(x => x.sleep !== null && x.brainAcc !== null);
+  if (data.length < 6) return null;
+  const short = data.filter(x => x.sleep < 6.5).map(x => x.brainAcc);
+  const long  = data.filter(x => x.sleep >= 7.5).map(x => x.brainAcc);
+  if (short.length < 3 || long.length < 3) return null;
+  const aS = avg(short), aL = avg(long);
+  const diff = aL - aS;
+  if (Math.abs(diff) < 5) return null;
+  const direction = diff > 0 ? 'выше' : 'ниже';
+  return {
+    icon: '🧠',
+    title: 'Сон и концентрация',
+    text: `После <b>≥ 7.5 ч</b> сна средняя точность упражнений — <b>${Math.round(aL)}%</b>.
+           После <b>< 6.5 ч</b> — <b>${Math.round(aS)}%</b>. 
+           Концентрация на <b>${Math.round(Math.abs(diff))}%</b> ${direction}.
+           <span style="opacity:.7">Наблюдение на твоих данных.</span>`
+  };
+}
+
+/* 6. Привычки → Настроение */
+function insightHabitsMood(){
+  const data = collectDailyMetrics(30).filter(x => x.habitPct !== null && x.mood !== null && x.habitPct > 0);
+  if (data.length < 6) return null;
+  const low = data.filter(x => x.habitPct < 40).map(x => x.mood);
+  const high = data.filter(x => x.habitPct >= 70).map(x => x.mood);
+  if (low.length < 3 || high.length < 3) return null;
+  const aL = avg(low), aH = avg(high);
+  const diff = aH - aL;
+  if (Math.abs(diff) < 0.4) return null;
+  return {
+    icon: '✅',
+    title: 'Привычки и настроение',
+    text: `Когда ты выполняешь <b>≥ 70%</b> привычек, настроение — <b>${aH.toFixed(1)}</b>.
+           Когда <b>< 40%</b> — <b>${aL.toFixed(1)}</b>. 
+           Разница <b>${Math.abs(diff).toFixed(1)}</b>.
+           <span style="opacity:.7">Возможное совпадение.</span>`
+  };
+}
+
+/* 7. Лучший день недели по настроению */
+function insightBestWeekday(){
+  const data = collectDailyMetrics(60).filter(x => x.mood !== null);
+  if (data.length < 12) return null;
+  const byDow = {};
+  data.forEach(x => { (byDow[x.dow] = byDow[x.dow] || []).push(x.mood); });
+  const stats = Object.keys(byDow).map(k => ({ dow:+k, avg: avg(byDow[k]), n: byDow[k].length })).filter(x => x.n >= 2);
+  if (stats.length < 4) return null;
+  stats.sort((a,b) => b.avg - a.avg);
+  const best = stats[0], worst = stats[stats.length-1];
+  if (best.avg - worst.avg < 0.5) return null;
+  const names = ['воскресенье','понедельник','вторник','среду','четверг','пятницу','субботу'];
+  return {
+    icon: '📅',
+    title: 'День недели и настроение',
+    text: `В <b>${names[best.dow]}</b> настроение в среднем выше — <b>${best.avg.toFixed(1)}</b>.
+           В <b>${names[worst.dow]}</b> — ниже — <b>${worst.avg.toFixed(1)}</b>.
+           Данных: ${best.n + worst.n} дней.
+           <span style="opacity:.7">Наблюдение.</span>`
+  };
+}
+
+/* 8. Единый отчёт */
+function findAllInsights(){
+  const insights = [
+    insightSleepMood(),
+    insightSleepProductivity(),
+    insightSleepBrain(),
+    insightMoodProductivity(),
+    insightWaterMood(),
+    insightHabitsMood(),
+    insightBestWeekday()
+  ].filter(Boolean);
+  return insights;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ГЛАВНЫЙ ЭКРАН STATS
+   ═══════════════════════════════════════════════════════════════════ */
 
 function renderStats(){
   const S = N.S;
@@ -51,7 +270,7 @@ function renderStats(){
   });
   recs.sort((a, b) => b.score - a.score);
 
-  const sleepMoodInsight = window.Sleep && window.Sleep.correlationInsight ? window.Sleep.correlationInsight() : '';
+  const insights = findAllInsights();
 
   const root = document.createElement('div');
   root.className = 'screen';
@@ -100,6 +319,31 @@ function renderStats(){
       </div>
     </div>
 
+    ${insights.length ? `
+    <div class="card" style="background:linear-gradient(155deg,#2A3A2F 0%,#1E2820 62%);color:#F4F2EA;border-color:transparent">
+      <div class="tiny" style="color:#F3E3C8;letter-spacing:.14em;margin-bottom:8px">🔍 НАБЛЮДЕНИЯ</div>
+      <div style="font-family:'Fraunces',serif;font-size:18px;font-weight:600;margin-bottom:4px">Закономерности в твоих данных</div>
+      <p style="font-size:12.5px;color:#C7CEC5;line-height:1.5">Это не диагноз и не причинность — просто то, что видно в накопленной статистике.</p>
+    </div>
+    ${insights.map(ins => `
+      <div class="card" style="padding:16px 18px">
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <div style="font-size:26px;line-height:1;flex-shrink:0">${ins.icon}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-family:'Fraunces',serif;font-size:15px;font-weight:600;margin-bottom:6px">${ins.title}</div>
+            <div style="font-size:13.5px;line-height:1.55;color:var(--ink-soft)">${ins.text}</div>
+          </div>
+        </div>
+      </div>
+    `).join('')}
+    ` : `
+    <div class="card" style="padding:24px;text-align:center">
+      <div style="font-size:40px;margin-bottom:10px">🔍</div>
+      <div class="h3" style="font-family:'Fraunces',serif;font-size:16px;margin-bottom:6px">Наблюдений пока нет</div>
+      <p class="muted" style="font-size:12.5px">Нужно минимум 3–6 дней с разными метриками, чтобы найти закономерности. Веди сон, настроение и дела — появятся инсайты.</p>
+    </div>
+    `}
+
     <div class="card">
       <div class="between" style="margin-bottom:12px">
         <div>
@@ -121,7 +365,6 @@ function renderStats(){
     </div>
 
     <div id="stats-mood-slot"></div>
-    ${sleepMoodInsight ? `<div class="mood-correlation">${sleepMoodInsight}</div>` : ''}
 
     <div class="card">
       <div class="h3" style="font-family:'Fraunces',serif;font-size:16px;margin-bottom:14px">Сегодня</div>

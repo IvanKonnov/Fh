@@ -1,4 +1,4 @@
-/* ═══ NAVLIFE · CORE · v3.1 ═══ */
+/* ═══ NAVLIFE · CORE · v3.5 ═══ */
 'use strict';
 
 const $  = (s, r=document) => r.querySelector(s);
@@ -25,12 +25,18 @@ const TIMEOUT = Symbol('timeout');
 const STORAGE_KEY = 'navlife-unified-v7';
 const DEFAULT_STATE = {
   version: 7,
-  shared:{ onboarded:false, theme:'light', sound:true, haptics:true, notifications:false, name:'Игрок', avatar:'🧠', avatarType:'emoji', dailyGoal:3 },
+  shared:{
+    onboarded:false, theme:'light', sound:true, haptics:true,
+    notifications:false,
+    notificationLeadTimes:[1,5],
+    name:'Игрок', avatar:'🧠', avatarType:'emoji', dailyGoal:3
+  },
   navlife:{ goals:[], schedule:[], programs:[], baseRoutine:[], dailyStats:{}, viewDate: todayKey(), customKnowledge:[], baseSkip:{} },
   neurofit:{ xp:0, streak:0, bestStreak:0, lastDay:null, todayDay:null, todayCount:0, totalSessions:0, totalMs:0, levels:{}, manualDiff:{}, records:{}, sessions:[], catTried:{}, preferredMode:'normal' },
   nutrition:{
-    goals:{ calories:2000, protein:100, fat:70, carbs:250, water:2000 },
+    goals:{ calories:2000, protein:150, fat:55, carbs:225, water:2000 },
     user:{ gender:'m', age:30, weight:75, height:180, activity:1.4, goalType:'maintain' },
+    preferences:{ mealGoal:'maintain', mealsPerDay:4, diet:'обычное', tier:'any', exclusions:[] },
     days:{}, weights:[], myFoods:[], templates:[], viewDate: todayKey(), _manualDate:false
   },
   mood:{}, reflections:[], meta:{}, habits:[], sleep:{},
@@ -45,11 +51,15 @@ function migrateState(p){
   if (!p || typeof p !== 'object') p = {};
   const out = { ...JSON.parse(JSON.stringify(DEFAULT_STATE)), ...p };
   out.shared    = { ...DEFAULT_STATE.shared,    ...(p.shared    || {}) };
+  if (!Array.isArray(out.shared.notificationLeadTimes)) out.shared.notificationLeadTimes = [1,5];
   out.navlife   = { ...DEFAULT_STATE.navlife,   ...(p.navlife   || {}) };
   out.neurofit  = { ...DEFAULT_STATE.neurofit,  ...(p.neurofit  || {}) };
   out.nutrition = { ...DEFAULT_STATE.nutrition, ...(p.nutrition || {}) };
   out.nutrition.goals = { ...DEFAULT_STATE.nutrition.goals, ...((p.nutrition||{}).goals||{}) };
   out.nutrition.user  = { ...DEFAULT_STATE.nutrition.user,  ...((p.nutrition||{}).user ||{}) };
+  out.nutrition.preferences = { ...DEFAULT_STATE.nutrition.preferences, ...((p.nutrition||{}).preferences||{}) };
+  if (!Array.isArray(out.nutrition.preferences.exclusions)) out.nutrition.preferences.exclusions = [];
+  if (!out.nutrition.preferences.tier) out.nutrition.preferences.tier = 'any';
   out.neurofit.levels     = { ...((p.neurofit||{}).levels     || {}) };
   out.neurofit.manualDiff = { ...((p.neurofit||{}).manualDiff || {}) };
   out.neurofit.records    = { ...((p.neurofit||{}).records    || {}) };
@@ -226,9 +236,8 @@ function go(name){
   if (!fn){ console.error('[go] unknown:', name); return; }
 
   let el;
-  try {
-    el = fn();
-  } catch (err) {
+  try { el = fn(); }
+  catch (err) {
     console.error('[render:' + name + ']', err);
     const fallback = document.createElement('div');
     fallback.className = 'screen active';
@@ -415,7 +424,7 @@ function completeScheduleItem(id, done){
   go(currentScreen || 'today');
 }
 
-/* ═══ BRIDGE — ЭКСПОРТ ДЛЯ МОДУЛЕЙ ═══ */
+/* ═══ BRIDGE ═══ */
 window.__nav = {
   get S(){ return S; },
   set S(v){ S = v; },
@@ -444,12 +453,7 @@ setInterval(saveState, 30000);
 window.addEventListener('beforeunload', saveState);
 document.addEventListener('visibilitychange', () => { if (document.hidden) saveState(); });
 
-/* ═══════════════════════════════════════════════════════════════════
-   ГЛОБАЛЬНЫЕ ШИМЫ — защита от рассинхронизации между файлами.
-   Если какой-то модуль напишет `const { $ } = window;` — сработает.
-   Если Service Worker отдаст из кэша старый core без этих экспортов,
-   шимы всё равно сделают `window.$` доступным.
-   ═══════════════════════════════════════════════════════════════════ */
+/* ═══ ГЛОБАЛЬНЫЕ ШИМЫ ═══ */
 window.$  = $;
 window.$$ = $$;
 window.esc = esc;
