@@ -1,22 +1,283 @@
-/* ═══ NAVLIFE · STATS · с анализом взаимосвязей ═══ */
+/* ═══ NAVLIFE · STATS · v5.0 · красивые наблюдения ═══ */
 (function(){
 'use strict';
 const N = window.__nav;
 if (!N){ console.error('[STATS] __nav not found'); return; }
-const { go, esc, todayKey, fmtDate, levelInfo, dowShort, dowNames, nutritionToday, itemsForDate } = N;
+const { go, esc, todayKey, fmtDate, levelInfo, dowShort, nutritionToday, itemsForDate } = N;
+
+/* ═══ ИНЖЕКТ СТИЛЕЙ ═══ */
+const STYLE_ID = 'navlife-stats-styles';
+function ensureStyles(){
+  if (document.getElementById(STYLE_ID)) return;
+  const style = document.createElement('style');
+  style.id = STYLE_ID;
+  style.textContent = `
+/* ═══ Insight cards ═══ */
+.insight-card{
+  background:var(--glass-bg,var(--surface-raised));
+  border:1px solid var(--glass-border,var(--line));
+  border-radius:16px;
+  padding:16px;
+  margin-bottom:10px;
+  backdrop-filter:blur(20px) saturate(150%);
+  -webkit-backdrop-filter:blur(20px) saturate(150%);
+  box-shadow:0 1px 0 0 var(--glass-hi,rgba(255,255,255,.9)) inset,0 10px 30px -16px rgba(27,33,29,.2);
+}
+.insight-head{
+  display:flex;gap:12px;align-items:center;
+  margin-bottom:14px;
+}
+.insight-em{
+  font-size:26px;line-height:1;
+  flex-shrink:0;
+  width:44px;height:44px;
+  border-radius:12px;
+  display:grid;place-items:center;
+  background:linear-gradient(135deg,var(--moss-soft),var(--paper));
+  border:1px solid var(--line);
+}
+.insight-head-text{flex:1;min-width:0;}
+.insight-title{
+  font-family:'Fraunces',serif;
+  font-size:15px;font-weight:600;
+  color:var(--ink);letter-spacing:-.01em;
+  margin-bottom:2px;
+}
+.insight-hint{
+  font-size:11.5px;color:var(--ink-soft);
+  line-height:1.4;
+}
+.insight-body{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin-bottom:12px;
+}
+.insight-panel{
+  padding:12px 10px;
+  border-radius:12px;
+  text-align:center;
+  position:relative;
+  overflow:hidden;
+  transition:transform .14s;
+}
+.insight-panel.low{
+  background:linear-gradient(180deg,var(--paper),var(--surface-raised));
+  border:1px solid var(--line);
+}
+.insight-panel.high{
+  background:linear-gradient(180deg,var(--moss-soft),var(--surface-raised));
+  border:1px solid var(--moss);
+  box-shadow:0 0 0 1px rgba(63,97,82,.06);
+}
+.panel-label{
+  font-size:10.5px;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+  font-weight:700;
+  color:var(--ink-mute);
+  margin-bottom:2px;
+}
+.insight-panel.high .panel-label{color:var(--moss);}
+.panel-sub{
+  font-size:11px;
+  color:var(--ink-soft);
+  font-weight:600;
+  margin-bottom:8px;
+}
+.insight-panel.high .panel-sub{color:var(--moss);}
+.panel-value{
+  font-family:'Fraunces',serif;
+  font-size:30px;
+  font-weight:600;
+  line-height:1;
+  color:var(--ink);
+  letter-spacing:-.02em;
+}
+.insight-panel.high .panel-value{color:var(--moss);}
+.panel-value small{
+  font-size:13px;
+  font-weight:500;
+  color:var(--ink-soft);
+  letter-spacing:0;
+  margin-left:2px;
+}
+.insight-panel.high .panel-value small{color:var(--moss);opacity:.7;}
+.panel-bar{
+  height:4px;
+  border-radius:4px;
+  background:var(--line-soft);
+  margin:10px 4px 6px;
+  overflow:hidden;
+}
+.panel-bar > div{
+  height:100%;
+  border-radius:4px;
+  background:var(--ink-mute);
+  transition:width .6s cubic-bezier(.22,1,.36,1);
+}
+.insight-panel.high .panel-bar > div{background:var(--moss);}
+.panel-days{
+  font-size:10px;
+  color:var(--ink-mute);
+  font-weight:600;
+  letter-spacing:.04em;
+}
+.insight-diff{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  padding:10px 12px;
+  border-radius:10px;
+  background:var(--moss-soft);
+  color:var(--moss);
+  font-size:13px;
+  font-weight:600;
+}
+.insight-diff .arrow{
+  font-size:16px;
+  font-weight:700;
+}
+.insight-diff.neutral{
+  background:var(--paper);
+  color:var(--ink-soft);
+}
+.insight-note{
+  text-align:center;
+  font-size:10.5px;
+  color:var(--ink-mute);
+  margin-top:10px;
+  letter-spacing:.02em;
+}
+
+/* Highlight карточка (одиночный акцент) */
+.insight-highlight{
+  text-align:center;
+  padding:18px 12px;
+  border-radius:14px;
+  background:linear-gradient(135deg,var(--amber-soft),var(--paper));
+  border:1px solid var(--amber);
+  margin-bottom:12px;
+}
+.insight-highlight .hl-value{
+  font-family:'Fraunces',serif;
+  font-size:28px;
+  font-weight:600;
+  color:var(--amber-dim);
+  letter-spacing:-.02em;
+  line-height:1.1;
+}
+.insight-highlight .hl-sub{
+  font-size:12px;
+  color:var(--amber-dim);
+  margin-top:4px;
+  opacity:.85;
+  font-weight:500;
+}
+
+/* Вводная карточка «Наблюдения» */
+.observations-hero{
+  padding:18px 20px;
+  border-radius:16px;
+  background:linear-gradient(155deg,#2A3A2F 0%,#1E2820 62%);
+  color:#F4F2EA;
+  margin-bottom:12px;
+  position:relative;
+  overflow:hidden;
+  box-shadow:0 20px 50px -20px rgba(0,0,0,.5);
+}
+.observations-hero::after{
+  content:'';position:absolute;right:-40px;top:-40px;width:160px;height:160px;border-radius:50%;
+  background:radial-gradient(circle,rgba(184,127,53,.35),transparent 70%);
+  pointer-events:none;
+}
+.observations-hero .oh-eyebrow{
+  font-size:11px;
+  letter-spacing:.16em;
+  color:#F3E3C8;
+  font-weight:700;
+  margin-bottom:6px;
+}
+.observations-hero .oh-title{
+  font-family:'Fraunces',serif;
+  font-size:19px;
+  font-weight:600;
+  color:#fff;
+  letter-spacing:-.01em;
+  margin-bottom:4px;
+}
+.observations-hero .oh-sub{
+  font-size:12.5px;
+  color:#C7CEC5;
+  line-height:1.5;
+  max-width:44ch;
+}
+
+/* Компактная сводка «Твои средние» */
+.summary-hero{
+  padding:16px 18px;
+  border-radius:16px;
+  background:linear-gradient(155deg,#2A3A2F 0%,#1E2820 62%);
+  color:#F4F2EA;
+  margin-bottom:12px;
+}
+.summary-hero .sh-title{
+  font-family:'Fraunces',serif;
+  font-size:16px;
+  font-weight:600;
+  color:#fff;
+  margin-bottom:10px;
+}
+.summary-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+}
+.summary-item{
+  padding:10px 12px;
+  background:rgba(255,255,255,.07);
+  border-radius:10px;
+  border:1px solid rgba(255,255,255,.06);
+}
+.summary-item .si-label{
+  font-size:10px;
+  letter-spacing:.08em;
+  color:#9AA398;
+  font-weight:600;
+  margin-bottom:4px;
+  display:flex;align-items:center;gap:4px;
+}
+.summary-item .si-value{
+  font-family:'Fraunces',serif;
+  font-size:20px;
+  font-weight:600;
+  color:#F3E3C8;
+  line-height:1;
+  letter-spacing:-.01em;
+}
+.summary-item .si-sub{
+  font-size:10.5px;
+  color:#9AA398;
+  margin-top:4px;
+}
+  `;
+  document.head.appendChild(style);
+}
+
 const CATS = { memory:{name:'Память',icon:'🧠'}, speed:{name:'Внимание',icon:'⚡'}, math:{name:'Счёт',icon:'🔢'}, logic:{name:'Логика',icon:'🧩'} };
 const MODES = { normal:{emoji:'📋'}, endless:{emoji:'♾️'}, survival:{emoji:'💀'} };
 
-/* ═══════════════════════════════════════════════════════════════════
-   АНАЛИЗ ВЗАИМОСВЯЗЕЙ
-   Ищем закономерности в накопленных данных.
-   Порог: минимум 3 точки в каждой группе, чтобы избежать случайных выводов.
-   Формулируем как НАБЛЮДЕНИЕ, не как причину.
-   ═══════════════════════════════════════════════════════════════════ */
-
+/* ═══ Хелперы ═══ */
 function avg(arr){ return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0; }
+function pluralDays(n){
+  if (n === 1) return 'день';
+  if (n < 5) return 'дня';
+  return 'дней';
+}
+const MIN_TOTAL = 4;
+const MIN_GROUP = 2;
 
-/* Собрать данные за последние N дней в единый датасет */
 function collectDailyMetrics(daysBack = 30){
   const S = N.S;
   const out = [];
@@ -39,8 +300,7 @@ function collectDailyMetrics(daysBack = 30){
     const habitTotal = (S.habits || []).length;
 
     out.push({
-      ds,
-      dow: d.getDay(),
+      ds, dow: d.getDay(),
       sleep: S.sleep[ds] ? S.sleep[ds].hours : null,
       sleepQuality: S.sleep[ds] ? S.sleep[ds].quality : null,
       mood: S.mood[ds] ? S.mood[ds].m : null,
@@ -52,143 +312,184 @@ function collectDailyMetrics(daysBack = 30){
       schedulePct: total ? Math.round(done/total*100) : null,
       brainAcc: avgAccToday,
       brainSessions: sessionsToday.length,
-      habitPct: habitTotal ? Math.round(habitDone/habitTotal*100) : null
+      habitPct: habitTotal ? Math.round(habitDone/habitTotal*100) : null,
+      breathingMin: (S.breathing && S.breathing.sessions || []).filter(x => x.d === ds).reduce((s,x) => s + Math.round((x.seconds||0)/60), 0)
     });
   }
   return out;
 }
 
-/* 1. Сон → Настроение */
+/* ═══ Сводки ═══ */
+function simpleSummaries(){
+  const data = collectDailyMetrics(30);
+  const withSleep = data.filter(x => x.sleep !== null);
+  const withMood = data.filter(x => x.mood !== null);
+  const withWater = data.filter(x => x.water > 0);
+  const withSchedule = data.filter(x => x.scheduleTotal > 0);
+  const withHabits = data.filter(x => x.habitPct !== null && x.habitPct > 0);
+  const withBreath = data.filter(x => x.breathingMin > 0);
+
+  const out = [];
+  if (withSleep.length >= 2){
+    out.push({ icon:'😴', label:'СОН', value:`${avg(withSleep.map(x => x.sleep)).toFixed(1)} ч`, sub:`${withSleep.length} ${pluralDays(withSleep.length)}` });
+  }
+  if (withMood.length >= 2){
+    out.push({ icon:'🙂', label:'НАСТРОЕНИЕ', value:`${avg(withMood.map(x => x.mood)).toFixed(1)}/5`, sub:`${withMood.length} ${pluralDays(withMood.length)}` });
+  }
+  if (withWater.length >= 2){
+    out.push({ icon:'💧', label:'ВОДА', value:`${Math.round(avg(withWater.map(x => x.water)))} мл`, sub:`${withWater.length} ${pluralDays(withWater.length)}` });
+  }
+  if (withSchedule.length >= 2){
+    out.push({ icon:'📋', label:'ДЕЛА', value:`${Math.round(avg(withSchedule.map(x => x.schedulePct)))}%`, sub:`${withSchedule.length} ${pluralDays(withSchedule.length)}` });
+  }
+  if (withHabits.length >= 2){
+    out.push({ icon:'✅', label:'ПРИВЫЧКИ', value:`${Math.round(avg(withHabits.map(x => x.habitPct)))}%`, sub:`${withHabits.length} ${pluralDays(withHabits.length)}` });
+  }
+  if (withBreath.length >= 2){
+    const total = withBreath.reduce((s,x) => s + x.breathingMin, 0);
+    out.push({ icon:'🧘', label:'ДЫХАНИЕ', value:`${total} мин`, sub:`${withBreath.length} ${pluralDays(withBreath.length)}` });
+  }
+  return out;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ИНСАЙТЫ — новая структура: сравнительная (две панели) или highlight
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ─── Сравнительная ───
+   Возвращает { icon, title, hint, left, right, diff, diffLabel, note }
+   left / right: { label, sub, value, unit, days, pct }
+   diff: { value, direction: 'up' | 'down' } */
+function makeComparative(cfg){ return cfg; }
+
 function insightSleepMood(){
   const data = collectDailyMetrics(30).filter(x => x.sleep !== null && x.mood !== null);
-  if (data.length < 6) return null;
+  if (data.length < MIN_TOTAL) return null;
   const short = data.filter(x => x.sleep < 6.5).map(x => x.mood);
-  const mid   = data.filter(x => x.sleep >= 6.5 && x.sleep < 7.5).map(x => x.mood);
   const long  = data.filter(x => x.sleep >= 7.5).map(x => x.mood);
-  if (short.length < 3 || long.length < 3) return null;
+  if (short.length < MIN_GROUP || long.length < MIN_GROUP) return null;
   const aS = avg(short), aL = avg(long);
   const diff = aL - aS;
   if (Math.abs(diff) < 0.4) return null;
-  const direction = diff > 0 ? 'выше' : 'ниже';
-  const fill = (v) => v.toFixed(1);
-  return {
+  const direction = diff > 0 ? 'up' : 'down';
+  return makeComparative({
     icon: '😴',
     title: 'Сон и настроение',
-    text: `В дни, когда ты спал <b>≥ 7.5 ч</b>, настроение в среднем <b>${fill(aL)}</b> из 5. 
-           Когда <b>менее 6.5 ч</b> — <b>${fill(aS)}</b>. 
-           Настроение на <b>${Math.abs(diff).toFixed(1)}</b> ${direction}.
-           ${mid.length ? `При среднем сне — <b>${fill(avg(mid))}</b>.` : ''}
-           <span style="opacity:.7">Это наблюдение на твоих данных, а не доказанная причина.</span>`
-  };
+    hint: 'Как сон влияет на самочувствие',
+    left:  { label:'Мало сна',  sub:'< 6.5 ч', value:aS.toFixed(1), unit:'из 5', days:short.length, pct:(aS/5)*100 },
+    right: { label:'Много сна', sub:'≥ 7.5 ч', value:aL.toFixed(1), unit:'из 5', days:long.length,  pct:(aL/5)*100 },
+    diff:  { value:Math.abs(diff).toFixed(1), direction, label: direction === 'up' ? 'в пользу хорошего сна' : 'в пользу короткого сна' },
+    note: 'Наблюдение на твоих данных'
+  });
 }
 
-/* 2. Сон → Продуктивность (дела) */
 function insightSleepProductivity(){
   const data = collectDailyMetrics(30).filter(x => x.sleep !== null && x.schedulePct !== null && x.scheduleTotal >= 3);
-  if (data.length < 6) return null;
+  if (data.length < MIN_TOTAL) return null;
   const short = data.filter(x => x.sleep < 6.5).map(x => x.schedulePct);
   const long  = data.filter(x => x.sleep >= 7.5).map(x => x.schedulePct);
-  if (short.length < 3 || long.length < 3) return null;
+  if (short.length < MIN_GROUP || long.length < MIN_GROUP) return null;
   const aS = avg(short), aL = avg(long);
   const diff = aL - aS;
   if (Math.abs(diff) < 8) return null;
-  const direction = diff > 0 ? 'больше' : 'меньше';
-  return {
+  const direction = diff > 0 ? 'up' : 'down';
+  return makeComparative({
     icon: '📋',
     title: 'Сон и дела',
-    text: `После сна <b>≥ 7.5 ч</b> ты выполняешь в среднем <b>${Math.round(aL)}%</b> дел, 
-           а после <b>< 6.5 ч</b> — <b>${Math.round(aS)}%</b>. 
-           Разница <b>${Math.round(Math.abs(diff))}%</b> в пользу ${direction === 'больше' ? 'хорошего сна' : 'короткого сна'}.
-           <span style="opacity:.7">Наблюдение на твоих данных.</span>`
-  };
+    hint: 'Сколько дел закрываешь при разном сне',
+    left:  { label:'Мало сна',  sub:'< 6.5 ч', value:`${Math.round(aS)}`, unit:'%',  days:short.length, pct:aS },
+    right: { label:'Много сна', sub:'≥ 7.5 ч', value:`${Math.round(aL)}`, unit:'%',  days:long.length,  pct:aL },
+    diff:  { value:`${Math.round(Math.abs(diff))}%`, direction, label: direction === 'up' ? 'в пользу хорошего сна' : 'в пользу короткого сна' },
+    note: 'Наблюдение'
+  });
 }
 
-/* 3. Настроение → Продуктивность */
 function insightMoodProductivity(){
   const data = collectDailyMetrics(30).filter(x => x.mood !== null && x.schedulePct !== null && x.scheduleTotal >= 3);
-  if (data.length < 6) return null;
+  if (data.length < MIN_TOTAL) return null;
   const low = data.filter(x => x.mood <= 2).map(x => x.schedulePct);
   const high = data.filter(x => x.mood >= 4).map(x => x.schedulePct);
-  if (low.length < 3 || high.length < 3) return null;
+  if (low.length < MIN_GROUP || high.length < MIN_GROUP) return null;
   const aL = avg(low), aH = avg(high);
   const diff = aH - aL;
   if (Math.abs(diff) < 10) return null;
-  return {
+  return makeComparative({
     icon: '🙂',
     title: 'Настроение и дела',
-    text: `В дни с настроением <b>😄 / 🤩</b> ты выполняешь <b>${Math.round(aH)}%</b> дел,
-           а в дни с <b>😞 / 😐</b> — <b>${Math.round(aL)}%</b>. 
-           Разница <b>${Math.round(Math.abs(diff))}%</b>.
-           <span style="opacity:.7">Это корреляция, не причина.</span>`
-  };
+    hint: 'Как самочувствие связано с продуктивностью',
+    left:  { label:'Плохое',  sub:'😞 / 😐', value:`${Math.round(aL)}`, unit:'%', days:low.length,  pct:aL },
+    right: { label:'Хорошее', sub:'😄 / 🤩', value:`${Math.round(aH)}`, unit:'%', days:high.length, pct:aH },
+    diff:  { value:`${Math.round(Math.abs(diff))}%`, direction:'up', label:'в пользу хорошего настроения' },
+    note: 'Корреляция, не причина'
+  });
 }
 
-/* 4. Вода → Настроение */
 function insightWaterMood(){
   const data = collectDailyMetrics(30).filter(x => x.water > 0 && x.mood !== null);
-  if (data.length < 6) return null;
+  if (data.length < MIN_TOTAL) return null;
   const goal = N.S.nutrition.goals.water || 2000;
   const low = data.filter(x => x.water < goal * 0.6).map(x => x.mood);
   const high = data.filter(x => x.water >= goal * 0.9).map(x => x.mood);
-  if (low.length < 3 || high.length < 3) return null;
+  if (low.length < MIN_GROUP || high.length < MIN_GROUP) return null;
   const aL = avg(low), aH = avg(high);
   const diff = aH - aL;
   if (Math.abs(diff) < 0.4) return null;
-  return {
+  return makeComparative({
     icon: '💧',
     title: 'Вода и настроение',
-    text: `Когда ты пьёшь <b>≥ ${Math.round(goal*0.9)} мл</b> воды, настроение в среднем <b>${aH.toFixed(1)}</b>.
-           Когда <b>< ${Math.round(goal*0.6)} мл</b> — <b>${aL.toFixed(1)}</b>. 
-           Разница <b>${Math.abs(diff).toFixed(1)}</b>.
-           <span style="opacity:.7">Наблюдение, не доказательство.</span>`
-  };
+    hint: 'Связь питьевого режима и самочувствия',
+    left:  { label:'Мало воды', sub:`< ${(goal*0.6/1000).toFixed(1)} л`, value:aL.toFixed(1), unit:'из 5', days:low.length,  pct:(aL/5)*100 },
+    right: { label:'Норма',     sub:`≥ ${(goal*0.9/1000).toFixed(1)} л`, value:aH.toFixed(1), unit:'из 5', days:high.length, pct:(aH/5)*100 },
+    diff:  { value:Math.abs(diff).toFixed(1), direction:'up', label:'в пользу нормы воды' },
+    note: 'Наблюдение'
+  });
 }
 
-/* 5. Сон → Точность в упражнениях мозга */
 function insightSleepBrain(){
   const data = collectDailyMetrics(30).filter(x => x.sleep !== null && x.brainAcc !== null);
-  if (data.length < 6) return null;
+  if (data.length < MIN_TOTAL) return null;
   const short = data.filter(x => x.sleep < 6.5).map(x => x.brainAcc);
   const long  = data.filter(x => x.sleep >= 7.5).map(x => x.brainAcc);
-  if (short.length < 3 || long.length < 3) return null;
+  if (short.length < MIN_GROUP || long.length < MIN_GROUP) return null;
   const aS = avg(short), aL = avg(long);
   const diff = aL - aS;
   if (Math.abs(diff) < 5) return null;
-  const direction = diff > 0 ? 'выше' : 'ниже';
-  return {
+  const direction = diff > 0 ? 'up' : 'down';
+  return makeComparative({
     icon: '🧠',
     title: 'Сон и концентрация',
-    text: `После <b>≥ 7.5 ч</b> сна средняя точность упражнений — <b>${Math.round(aL)}%</b>.
-           После <b>< 6.5 ч</b> — <b>${Math.round(aS)}%</b>. 
-           Концентрация на <b>${Math.round(Math.abs(diff))}%</b> ${direction}.
-           <span style="opacity:.7">Наблюдение на твоих данных.</span>`
-  };
+    hint: 'Точность упражнений при разном сне',
+    left:  { label:'Мало сна',  sub:'< 6.5 ч', value:`${Math.round(aS)}`, unit:'%', days:short.length, pct:aS },
+    right: { label:'Много сна', sub:'≥ 7.5 ч', value:`${Math.round(aL)}`, unit:'%', days:long.length,  pct:aL },
+    diff:  { value:`${Math.round(Math.abs(diff))}%`, direction, label: direction === 'up' ? 'в пользу хорошего сна' : 'в пользу короткого сна' },
+    note: 'Наблюдение'
+  });
 }
 
-/* 6. Привычки → Настроение */
 function insightHabitsMood(){
   const data = collectDailyMetrics(30).filter(x => x.habitPct !== null && x.mood !== null && x.habitPct > 0);
-  if (data.length < 6) return null;
+  if (data.length < MIN_TOTAL) return null;
   const low = data.filter(x => x.habitPct < 40).map(x => x.mood);
   const high = data.filter(x => x.habitPct >= 70).map(x => x.mood);
-  if (low.length < 3 || high.length < 3) return null;
+  if (low.length < MIN_GROUP || high.length < MIN_GROUP) return null;
   const aL = avg(low), aH = avg(high);
   const diff = aH - aL;
   if (Math.abs(diff) < 0.4) return null;
-  return {
+  return makeComparative({
     icon: '✅',
     title: 'Привычки и настроение',
-    text: `Когда ты выполняешь <b>≥ 70%</b> привычек, настроение — <b>${aH.toFixed(1)}</b>.
-           Когда <b>< 40%</b> — <b>${aL.toFixed(1)}</b>. 
-           Разница <b>${Math.abs(diff).toFixed(1)}</b>.
-           <span style="opacity:.7">Возможное совпадение.</span>`
-  };
+    hint: 'Связь выполнения привычек с самочувствием',
+    left:  { label:'Мало привычек', sub:'< 40%', value:aL.toFixed(1), unit:'из 5', days:low.length,  pct:(aL/5)*100 },
+    right: { label:'Много',         sub:'≥ 70%', value:aH.toFixed(1), unit:'из 5', days:high.length, pct:(aH/5)*100 },
+    diff:  { value:Math.abs(diff).toFixed(1), direction:'up', label:'в пользу дня с привычками' },
+    note: 'Наблюдение'
+  });
 }
 
-/* 7. Лучший день недели по настроению */
+/* ─── Highlight (одиночная цифра) ─── */
 function insightBestWeekday(){
   const data = collectDailyMetrics(60).filter(x => x.mood !== null);
-  if (data.length < 12) return null;
+  if (data.length < MIN_TOTAL * 2) return null;
   const byDow = {};
   data.forEach(x => { (byDow[x.dow] = byDow[x.dow] || []).push(x.mood); });
   const stats = Object.keys(byDow).map(k => ({ dow:+k, avg: avg(byDow[k]), n: byDow[k].length })).filter(x => x.n >= 2);
@@ -196,36 +497,139 @@ function insightBestWeekday(){
   stats.sort((a,b) => b.avg - a.avg);
   const best = stats[0], worst = stats[stats.length-1];
   if (best.avg - worst.avg < 0.5) return null;
-  const names = ['воскресенье','понедельник','вторник','среду','четверг','пятницу','субботу'];
+  const names = ['Воскресенье','Понедельник','Вторник','Среда','Четверг','Пятница','Суббота'];
   return {
     icon: '📅',
-    title: 'День недели и настроение',
-    text: `В <b>${names[best.dow]}</b> настроение в среднем выше — <b>${best.avg.toFixed(1)}</b>.
-           В <b>${names[worst.dow]}</b> — ниже — <b>${worst.avg.toFixed(1)}</b>.
-           Данных: ${best.n + worst.n} дней.
-           <span style="opacity:.7">Наблюдение.</span>`
+    title: 'Лучший день недели',
+    hint: 'Когда настроение в среднем выше всего',
+    highlight: {
+      value: names[best.dow],
+      sub: `${best.avg.toFixed(1)} из 5 · ${best.n} ${pluralDays(best.n)}`
+    },
+    extra: {
+      icon: '⬇',
+      text: `Хуже всего — <b>${names[worst.dow]}</b>: ${worst.avg.toFixed(1)} из 5`,
+      neutral: true
+    },
+    note: 'Наблюдение'
   };
 }
 
-/* 8. Единый отчёт */
+function insightBreathing(){
+  const data = collectDailyMetrics(30).filter(x => x.breathingMin > 0);
+  if (data.length < 2) return null;
+  const totalMin = data.reduce((s,x) => s + x.breathingMin, 0);
+  return {
+    icon: '🧘',
+    title: 'Дыхательные практики',
+    hint: 'Твоя динамика',
+    highlight: {
+      value: `${totalMin} мин`,
+      sub: `за ${data.length} ${pluralDays(data.length)}`
+    },
+    extra: null,
+    note: 'Регулярность снижает тревогу'
+  };
+}
+
 function findAllInsights(){
-  const insights = [
+  return [
     insightSleepMood(),
     insightSleepProductivity(),
     insightSleepBrain(),
     insightMoodProductivity(),
     insightWaterMood(),
     insightHabitsMood(),
-    insightBestWeekday()
+    insightBestWeekday(),
+    insightBreathing()
   ].filter(Boolean);
-  return insights;
+}
+
+/* ═══ Диагностика ═══ */
+function dataDebug(){
+  const data = collectDailyMetrics(30);
+  const withSleep = data.filter(x => x.sleep !== null).length;
+  const withMood = data.filter(x => x.mood !== null).length;
+  const withWater = data.filter(x => x.water > 0).length;
+  const withSchedule = data.filter(x => x.scheduleTotal > 0).length;
+  const withHabits = data.filter(x => x.habitPct !== null && x.habitPct > 0).length;
+  const both = data.filter(x => x.sleep !== null && x.mood !== null).length;
+  return { withSleep, withMood, withWater, withSchedule, withHabits, both };
+}
+
+/* ═══ Рендер одной карточки инсайта ═══ */
+function renderInsightCard(ins){
+  /* Highlight */
+  if (ins.highlight){
+    return `
+      <div class="insight-card">
+        <div class="insight-head">
+          <div class="insight-em">${ins.icon}</div>
+          <div class="insight-head-text">
+            <div class="insight-title">${esc(ins.title)}</div>
+            <div class="insight-hint">${esc(ins.hint)}</div>
+          </div>
+        </div>
+        <div class="insight-highlight">
+          <div class="hl-value">${esc(ins.highlight.value)}</div>
+          <div class="hl-sub">${esc(ins.highlight.sub)}</div>
+        </div>
+        ${ins.extra ? `
+          <div class="insight-diff neutral" style="margin-bottom:0">
+            <span class="arrow">${ins.extra.icon}</span>
+            <span>${ins.extra.text}</span>
+          </div>
+        ` : ''}
+        ${ins.note ? `<div class="insight-note">${esc(ins.note)}</div>` : ''}
+      </div>
+    `;
+  }
+
+  /* Сравнительная */
+  const left  = ins.left;
+  const right = ins.right;
+  const diff  = ins.diff;
+  const arrow = diff.direction === 'up' ? '↑' : '↓';
+
+  return `
+    <div class="insight-card">
+      <div class="insight-head">
+        <div class="insight-em">${ins.icon}</div>
+        <div class="insight-head-text">
+          <div class="insight-title">${esc(ins.title)}</div>
+          <div class="insight-hint">${esc(ins.hint)}</div>
+        </div>
+      </div>
+      <div class="insight-body">
+        <div class="insight-panel low">
+          <div class="panel-label">${esc(left.label)}</div>
+          <div class="panel-sub">${esc(left.sub)}</div>
+          <div class="panel-value">${esc(left.value)}<small>${esc(left.unit)}</small></div>
+          <div class="panel-bar"><div style="width:${Math.min(100, left.pct).toFixed(0)}%"></div></div>
+          <div class="panel-days">${left.days} ${pluralDays(left.days)}</div>
+        </div>
+        <div class="insight-panel high">
+          <div class="panel-label">${esc(right.label)}</div>
+          <div class="panel-sub">${esc(right.sub)}</div>
+          <div class="panel-value">${esc(right.value)}<small>${esc(right.unit)}</small></div>
+          <div class="panel-bar"><div style="width:${Math.min(100, right.pct).toFixed(0)}%"></div></div>
+          <div class="panel-days">${right.days} ${pluralDays(right.days)}</div>
+        </div>
+      </div>
+      <div class="insight-diff">
+        <span class="arrow">${arrow}</span>
+        <span>${esc(diff.value)} ${esc(diff.label)}</span>
+      </div>
+      ${ins.note ? `<div class="insight-note">${esc(ins.note)}</div>` : ''}
+    </div>
+  `;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   ГЛАВНЫЙ ЭКРАН STATS
+   ГЛАВНЫЙ ЭКРАН
    ═══════════════════════════════════════════════════════════════════ */
-
 function renderStats(){
+  ensureStyles();
   const S = N.S;
   const li = levelInfo(S.neurofit.xp);
   const todayDs = todayKey();
@@ -270,7 +674,9 @@ function renderStats(){
   });
   recs.sort((a, b) => b.score - a.score);
 
+  const summaries = simpleSummaries();
   const insights = findAllInsights();
+  const dbg = dataDebug();
 
   const root = document.createElement('div');
   root.className = 'screen';
@@ -319,29 +725,44 @@ function renderStats(){
       </div>
     </div>
 
-    ${insights.length ? `
-    <div class="card" style="background:linear-gradient(155deg,#2A3A2F 0%,#1E2820 62%);color:#F4F2EA;border-color:transparent">
-      <div class="tiny" style="color:#F3E3C8;letter-spacing:.14em;margin-bottom:8px">🔍 НАБЛЮДЕНИЯ</div>
-      <div style="font-family:'Fraunces',serif;font-size:18px;font-weight:600;margin-bottom:4px">Закономерности в твоих данных</div>
-      <p style="font-size:12.5px;color:#C7CEC5;line-height:1.5">Это не диагноз и не причинность — просто то, что видно в накопленной статистике.</p>
-    </div>
-    ${insights.map(ins => `
-      <div class="card" style="padding:16px 18px">
-        <div style="display:flex;gap:12px;align-items:flex-start">
-          <div style="font-size:26px;line-height:1;flex-shrink:0">${ins.icon}</div>
-          <div style="flex:1;min-width:0">
-            <div style="font-family:'Fraunces',serif;font-size:15px;font-weight:600;margin-bottom:6px">${ins.title}</div>
-            <div style="font-size:13.5px;line-height:1.55;color:var(--ink-soft)">${ins.text}</div>
-          </div>
+    ${summaries.length ? `
+      <div class="summary-hero">
+        <div class="sh-title">📊 Твои средние</div>
+        <div class="summary-grid">
+          ${summaries.map(s => `
+            <div class="summary-item">
+              <div class="si-label"><span>${s.icon}</span><span>${esc(s.label)}</span></div>
+              <div class="si-value">${esc(s.value)}</div>
+              <div class="si-sub">${esc(s.sub)}</div>
+            </div>
+          `).join('')}
         </div>
       </div>
-    `).join('')}
+    ` : ''}
+
+    ${insights.length ? `
+      <div class="observations-hero">
+        <div class="oh-eyebrow">🔍 НАБЛЮДЕНИЯ</div>
+        <div class="oh-title">Закономерности в данных</div>
+        <div class="oh-sub">Сравнение двух ситуаций на твоих записях. Это корреляция — не диагноз и не доказательство причины.</div>
+      </div>
+      ${insights.map(ins => renderInsightCard(ins)).join('')}
     ` : `
-    <div class="card" style="padding:24px;text-align:center">
-      <div style="font-size:40px;margin-bottom:10px">🔍</div>
-      <div class="h3" style="font-family:'Fraunces',serif;font-size:16px;margin-bottom:6px">Наблюдений пока нет</div>
-      <p class="muted" style="font-size:12.5px">Нужно минимум 3–6 дней с разными метриками, чтобы найти закономерности. Веди сон, настроение и дела — появятся инсайты.</p>
-    </div>
+      <div class="card" style="padding:22px 20px">
+        <div style="text-align:center;margin-bottom:14px">
+          <div style="font-size:40px;margin-bottom:8px">🔍</div>
+          <div class="h3" style="font-family:'Fraunces',serif;font-size:16px;margin-bottom:6px">Мало данных для закономерностей</div>
+          <p class="muted" style="font-size:12.5px">Нужно минимум <b>${MIN_TOTAL}</b> совпадающих дней в паре.</p>
+        </div>
+        <div style="display:grid;gap:6px;font-size:13px;color:var(--ink-soft);max-width:300px;margin:0 auto">
+          <div style="display:flex;justify-content:space-between"><span>😴 Сон</span><b style="color:var(--ink)">${dbg.withSleep} ${pluralDays(dbg.withSleep)}</b></div>
+          <div style="display:flex;justify-content:space-between"><span>🙂 Настроение</span><b style="color:var(--ink)">${dbg.withMood} ${pluralDays(dbg.withMood)}</b></div>
+          <div style="display:flex;justify-content:space-between"><span>💧 Вода</span><b style="color:var(--ink)">${dbg.withWater} ${pluralDays(dbg.withWater)}</b></div>
+          <div style="display:flex;justify-content:space-between"><span>📋 Дела</span><b style="color:var(--ink)">${dbg.withSchedule} ${pluralDays(dbg.withSchedule)}</b></div>
+          <div style="display:flex;justify-content:space-between"><span>✅ Привычки</span><b style="color:var(--ink)">${dbg.withHabits} ${pluralDays(dbg.withHabits)}</b></div>
+          <div style="display:flex;justify-content:space-between;border-top:1px solid var(--line);padding-top:8px;margin-top:4px"><span>🔗 Сон + настроение</span><b style="color:var(--moss)">${dbg.both} ${pluralDays(dbg.both)}</b></div>
+        </div>
+      </div>
     `}
 
     <div class="card">
@@ -408,7 +829,6 @@ function renderStats(){
     </div>` : ''}
 
     <div id="stats-reflection-slot"></div>
-
     <div style="height:20px"></div>`;
 
   return root;
@@ -434,12 +854,12 @@ window.App.hooks.afterGo.push(name => {
     document.querySelectorAll('[data-mood-open]').forEach(b => {
       b.onclick = e => { e.stopPropagation(); window.Mood && window.Mood.open(); };
     });
-    const reflectBtn = document.querySelector('#statsReflectBtn');
-    if (reflectBtn) reflectBtn.onclick = () => window.Reflection && window.Reflection.open();
-    const reflectHist = document.querySelector('#statsReflectHistBtn');
-    if (reflectHist) reflectHist.onclick = () => window.Reflection && window.Reflection.history();
-    const achBtn = document.querySelector('#statsAchBtn');
-    if (achBtn) achBtn.onclick = () => go('achievements');
+    const rb = document.querySelector('#statsReflectBtn');
+    if (rb) rb.onclick = () => window.Reflection && window.Reflection.open();
+    const rh = document.querySelector('#statsReflectHistBtn');
+    if (rh) rh.onclick = () => window.Reflection && window.Reflection.history();
+    const ab = document.querySelector('#statsAchBtn');
+    if (ab) ab.onclick = () => go('achievements');
   });
 });
 })();

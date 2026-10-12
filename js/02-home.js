@@ -132,6 +132,16 @@ function renderToday(){
         <div style="font-size:32px">→</div>
       </div>
     </div>
+    <div class="card tappable" style="margin-top:10px;background:linear-gradient(135deg,#3F6152,#2A3A2F);border-color:transparent;color:#F4F2EA" data-goto="breathing">
+      <div class="between">
+        <div>
+          <div class="tiny" style="color:#F3E3C8">ДЫХАНИЕ</div>
+          <div style="font-size:15px;font-weight:600;margin-top:4px;color:#fff">2 минуты спокойствия</div>
+          <div style="font-size:12px;color:#C7CEC5;margin-top:2px">4-7-8 · Box · Резонансное</div>
+        </div>
+        <div style="font-size:32px">🧘</div>
+      </div>
+    </div>
     <div id="home-eod-slot"></div>
     <div style="height:20px"></div>`;
 

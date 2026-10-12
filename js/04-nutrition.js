@@ -349,7 +349,7 @@ function renderNutrition(){
         <button class="water-btn minus" data-water="-200" type="button">−200</button>
       </div>
     </div>
-
+    ${window.Vitamins ? window.Vitamins.renderSection(ds) : ''}
     <div class="nutri-quick">
       <button class="nutri-quick-btn" data-quick="weight" type="button">
         <div class="nutri-quick-em">⚖️</div>
@@ -490,6 +490,7 @@ function renderNutrition(){
     <div style="height:20px"></div>`;
 
   root.addEventListener('click', e => {
+    if (window.Vitamins && window.Vitamins.handleClick(e, ds)) return;
     const t = e.target.closest('[data-meal-toggle]');
     if (t && !e.target.closest('[data-meal-add]') && !e.target.closest('[data-del-food]') && !e.target.closest('[data-edit-slot]')){
       t.closest('.meal-card').classList.toggle('open'); return;

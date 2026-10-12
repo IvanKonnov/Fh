@@ -1465,6 +1465,16 @@ function renderBrain(){
         }).join('')}
       `;
     }).join('')}
+    <div class="cat-title"><span>🌬️</span><span>Дыхание</span></div>
+    <button class="ex-item" data-goto-breathing type="button">
+      <div class="ex-ico">🧘</div>
+      <div class="ex-meta">
+        <div class="ex-nm">Дыхательные практики</div>
+        <div class="ex-tg"><span>4-7-8 · Box · Вздох и др.</span><span class="lvl">· 6 практик</span></div>
+      </div>
+      <span class="ex-arrow">›</span>
+    </button>
+
     <div style="height:20px"></div>`;
   $('#quickStart',root).onclick=()=>{
     SFX.tap();buzz(10);N.ensureAudio();
@@ -1478,7 +1488,8 @@ function renderBrain(){
   };
   root.addEventListener('click',e=>{
     const b=e.target.closest('[data-ex]');
-    if(b){SFX.tap();buzz(8);N.ensureAudio();startQueue([b.dataset.ex]);}
+    if(b){SFX.tap();buzz(8);N.ensureAudio();startQueue([b.dataset.ex]);return;}
+    if (e.target.closest('[data-goto-breathing]')){ SFX.tap(); buzz(8); go('breathing'); }
   });
   return root;
 }

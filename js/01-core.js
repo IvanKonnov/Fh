@@ -33,12 +33,15 @@ const DEFAULT_STATE = {
   },
   navlife:{ goals:[], schedule:[], programs:[], baseRoutine:[], dailyStats:{}, viewDate: todayKey(), customKnowledge:[], baseSkip:{} },
   neurofit:{ xp:0, streak:0, bestStreak:0, lastDay:null, todayDay:null, todayCount:0, totalSessions:0, totalMs:0, levels:{}, manualDiff:{}, records:{}, sessions:[], catTried:{}, preferredMode:'normal' },
-  nutrition:{
+    nutrition:{
     goals:{ calories:2000, protein:150, fat:55, carbs:225, water:2000 },
     user:{ gender:'m', age:30, weight:75, height:180, activity:1.4, goalType:'maintain' },
     preferences:{ mealGoal:'maintain', mealsPerDay:4, diet:'обычное', tier:'any', exclusions:[] },
+    vitamins: [],
+    vitaminLog: {},
     days:{}, weights:[], myFoods:[], templates:[], viewDate: todayKey(), _manualDate:false
   },
+  breathing: { totalSessions: 0, totalMs: 0, sessions: [] },
   mood:{}, reflections:[], meta:{}, habits:[], sleep:{},
   freezer:{ uses:2, monthKey:'', log:[] },
   achievements:{}, viewMode:'day'
@@ -79,6 +82,10 @@ function migrateState(p){
   if (!Array.isArray(out.navlife.programs)) out.navlife.programs = [];
   if (!Array.isArray(out.navlife.baseRoutine)) out.navlife.baseRoutine = [];
   if (!Array.isArray(out.navlife.goals)) out.navlife.goals = [];
+  if (!Array.isArray(out.nutrition.vitamins)) out.nutrition.vitamins = [];
+  if (!out.nutrition.vitaminLog || typeof out.nutrition.vitaminLog !== 'object') out.nutrition.vitaminLog = {};
+  if (!out.breathing || typeof out.breathing !== 'object') out.breathing = { totalSessions: 0, totalMs: 0, sessions: [] };
+  if (!Array.isArray(out.breathing.sessions)) out.breathing.sessions = [];
   if (!out.neurofit.sessions) out.neurofit.sessions = [];
   out.version = 7;
   return out;
