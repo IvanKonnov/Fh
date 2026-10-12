@@ -1,10 +1,67 @@
-/* ═══ NAVLIFE · GOALS / PROGRAMS / KNOWLEDGE / RUNNER ═══ */
+/* ═══ NAVLIFE · GOALS / PROGRAMS / KNOWLEDGE / RUNNER · v3.0 ═══
+   + Периодические цели (неделя / месяц)
+*/
 (function(){
 'use strict';
 const N = window.__nav;
+if (!N){ console.error('[GOALS] __nav not found'); return; }
 const { go, saveState, esc, uid, todayKey, toMin, openModal, closeModal, toast,
         SFX, buzz, pad2, levelInfo, $, $$ } = N;
 
+/* ═══ Периодические цели: утилиты ═══ */
+const PERIOD_INFO = {
+  week:  { label: 'Неделя',  days: 7,  target: 4 },
+  month: { label: 'Месяц',   days: 30, target: 12 }
+};
+
+function getPeriodStart(period){
+  const d = new Date(); d.setHours(0,0,0,0);
+  if (period === 'week'){
+    const dow = (d.getDay() + 6) % 7; // Пн = 0
+    d.setDate(d.getDate() - dow);
+  } else if (period === 'month'){
+    d.setDate(1);
+  }
+  return N.fmtDate(d);
+}
+function periodDaysLeft(period){
+  const start = getPeriodStart(period);
+  const d = new Date(start + 'T00:00:00');
+  d.setDate(d.getDate() + PERIOD_INFO[period].days);
+  const now = new Date();
+  const diff = Math.ceil((d - now) / 86400000);
+  return Math.max(0, diff);
+}
+function getProgressInPeriod(goal){
+  if (!goal.progress) goal.progress = [];
+  const start = getPeriodStart(goal.period);
+  return goal.progress.filter(d => d >= start);
+}
+function ensurePeriodProgress(goal){
+  if (goal.period === 'longterm') return;
+  goal.progress = goal.progress || [];
+  // Отфильтруем старые отметки, чтобы массив не пух
+  const cutoff = getPeriodStart('month');
+  goal.progress = goal.progress.filter(d => d >= cutoff);
+}
+function markPeriodGoalToday(goal){
+  ensurePeriodProgress(goal);
+  const ds = N.todayKey();
+  if (!goal.progress.includes(ds)){
+    goal.progress.push(ds);
+  }
+}
+function unmarkPeriodGoalToday(goal){
+  ensurePeriodProgress(goal);
+  const ds = N.todayKey();
+  goal.progress = goal.progress.filter(d => d !== ds);
+}
+function isMarkedToday(goal){
+  if (!goal.progress) return false;
+  return goal.progress.includes(N.todayKey());
+}
+
+/* ═══ Программы ═══ */
 const BUILTIN_PROGRAMS = [
   {title:'Утро',category:'утро',description:'Начать день осознанно.',
    steps:[
@@ -62,14 +119,14 @@ const BUILTIN_PROGRAMS = [
    ]},
   {title:'Помодоро',category:'концентрация',description:'Классическая техника: 4 блока по 25 минут с короткими перерывами и длинным отдыхом в конце.',
    steps:[
-     {title:'Работа · блок 1',type:'timer',duration:1500,instructions:'Полная концентрация. Убери телефон, закрой лишние вкладки.',why:'25 минут — оптимальная длительность для глубокой работы.'},
-     {title:'Короткий перерыв',type:'pause',duration:300,instructions:'Встань, попей воды, разомнись.',why:'Даёт мозгу восстановиться перед следующим блоком.'},
-     {title:'Работа · блок 2',type:'timer',duration:1500,instructions:'Вернись к задаче.',why:'Второй цикл помодоро.'},
-     {title:'Короткий перерыв',type:'pause',duration:300,instructions:'Не залипай в телефоне — лучше размяться.',why:'Восстановление.'},
-     {title:'Работа · блок 3',type:'timer',duration:1500,instructions:'Третий блок.',why:'Держим темп.'},
+     {title:'Работа · блок 1',type:'timer',duration:1500,instructions:'Полная концентрация.',why:'25 минут для глубокой работы.'},
+     {title:'Короткий перерыв',type:'pause',duration:300,instructions:'Встань, попей воды.',why:'Восстановление.'},
+     {title:'Работа · блок 2',type:'timer',duration:1500,instructions:'Вернись к задаче.',why:'Второй цикл.'},
+     {title:'Короткий перерыв',type:'pause',duration:300,instructions:'Разомнись.',why:'Восстановление.'},
+     {title:'Работа · блок 3',type:'timer',duration:1500,instructions:'Третий блок.',why:'Темп.'},
      {title:'Короткий перерыв',type:'pause',duration:300,instructions:'Отдохни.',why:'Отдых.'},
-     {title:'Работа · блок 4',type:'timer',duration:1500,instructions:'Финальный блок.',why:'Последний рывок.'},
-     {title:'Длинный перерыв',type:'pause',duration:900,instructions:'15 минут полноценного отдыха.',why:'После 4 помодоро организму нужен полноценный перерыв.'}
+     {title:'Работа · блок 4',type:'timer',duration:1500,instructions:'Финал.',why:'Последний рывок.'},
+     {title:'Длинный перерыв',type:'pause',duration:900,instructions:'15 минут отдыха.',why:'Полноценный перерыв.'}
    ]},
   {title:'Вечер',category:'вечер',description:'Плавный переход ко сну.',
    steps:[
@@ -152,6 +209,7 @@ function seedIfEmpty(){
       id: uid('goal'), title:'Выучить английский', icon:'🇬🇧',
       description:'Хочу уверенно понимать английскую речь.',
       status:'active', createdAt: todayKey(),
+      period: 'longterm',
       steps:[
         {id: uid('gstep'), title:'Повторять 20 слов', completed:false, linkedScheduleItemId:null, linkedProgramId:null},
         {id: uid('gstep'), title:'Слушать речь', completed:false, linkedScheduleItemId:null, linkedProgramId:null},
@@ -162,44 +220,42 @@ function seedIfEmpty(){
   }
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   ЭКРАН ЦЕЛЕЙ
+   ═══════════════════════════════════════════════════════════════════ */
 function renderGoals(){
   const root = document.createElement('div');
   root.className = 'screen';
+  const goals = N.S.navlife.goals || [];
+
+  /* Разделяем на longterm и периодические */
+  const longterm = goals.filter(g => (g.period || 'longterm') === 'longterm');
+  const periodic = goals.filter(g => g.period && g.period !== 'longterm');
+
   root.innerHTML = `
     <div class="row" style="margin-bottom:16px;gap:10px">
       <button class="icon-btn" id="back" type="button">←</button>
       <div class="h1" style="flex:1">Цели</div>
       <button class="btn btn-primary btn-sm" id="addGoal" type="button">+ Цель</button>
     </div>
-    ${N.S.navlife.goals.length ? N.S.navlife.goals.map(g => {
-      const total = g.steps.length, done = g.steps.filter(s => s.completed).length;
-      const pct = total ? Math.round(done/total*100) : 0;
-      return `<div class="card goal-card">
-        <div class="goal-head">
-          <div class="goal-icon">${g.icon||'🎯'}</div>
-          <div style="flex:1">
-            <div class="goal-title">${esc(g.title)}</div>
-            ${g.description ? `<p class="goal-desc">${esc(g.description)}</p>` : ''}
-          </div>
-          <button class="icon-btn btn-danger" style="width:32px;height:32px;font-size:13px" data-delgoal="${g.id}">✕</button>
-        </div>
-        <div class="goal-progress">
-          <div class="top"><span>${total?pct+'%':'нет шагов'}</span><span>${done}/${total}</span></div>
-          <div class="bar"><i class="on" style="--p:${(pct/100).toFixed(3)}"></i></div>
-        </div>
-        <ul class="goal-steps">
-          ${g.steps.map(s => `<li class="${s.completed?'done':''}">
-            <button class="check ${s.completed?'on':''}" data-tg="${g.id}|${s.id}">${s.completed?'✓':''}</button>
-            <span style="flex:1">${esc(s.title)}</span>
-          </li>`).join('')}
-        </ul>
-      </div>`;
-    }).join('') : '<div class="card" style="text-align:center;padding:32px"><p class="muted">Пока нет целей.</p></div>'}
+
+    ${periodic.length ? `
+      <div class="cat-title" style="margin-top:0"><span>📅</span><span>На период</span></div>
+      <div style="display:grid;gap:10px;margin-bottom:16px">
+        ${periodic.map(g => renderPeriodicGoal(g)).join('')}
+      </div>
+    ` : ''}
+
+    <div class="cat-title" style="${periodic.length ? '' : 'margin-top:0'}"><span>🎯</span><span>Долгосрочные</span></div>
+    ${longterm.length ? longterm.map(g => renderLongtermGoal(g)).join('')
+                     : '<div class="card" style="text-align:center;padding:24px"><p class="muted">Пока нет целей.</p></div>'}
     <div style="height:20px"></div>`;
 
   root.querySelector('#back').onclick = () => go('today');
   root.querySelector('#addGoal').onclick = openGoalModal;
+
   root.addEventListener('click', e => {
+    /* Longterm: чекбоксы шагов */
     const t = e.target.closest('[data-tg]');
     if (t){
       const [gid, sid] = t.dataset.tg.split('|');
@@ -207,60 +263,264 @@ function renderGoals(){
       const s = g.steps.find(x => x.id === sid);
       s.completed = !s.completed; saveState(); go('goals');
       if (window.Achievements) window.Achievements.check();
+      return;
     }
+    /* Периодические: отметка дня */
+    const pm = e.target.closest('[data-period-mark]');
+    if (pm){
+      const g = N.S.navlife.goals.find(x => x.id === pm.dataset.periodMark);
+      if (!g) return;
+      if (isMarkedToday(g)){
+        unmarkPeriodGoalToday(g);
+        N.SFX.tap();
+      } else {
+        markPeriodGoalToday(g);
+        N.SFX.ok(); buzz(10);
+      }
+      saveState(); go('goals');
+      if (window.Achievements) window.Achievements.check();
+      return;
+    }
+    /* Удаление */
     const dg = e.target.closest('[data-delgoal]');
     if (dg && confirm('Удалить цель?')){
       N.S.navlife.goals = N.S.navlife.goals.filter(g => g.id !== dg.dataset.delgoal);
       saveState(); go('goals');
+      return;
     }
+    /* Редактирование периодической */
+    const ped = e.target.closest('[data-period-edit]');
+    if (ped){ openGoalModal(ped.dataset.periodEdit); return; }
   });
+
   return root;
 }
 
-function openGoalModal(){
-  let steps = [''];
+function renderLongtermGoal(g){
+  const total = g.steps.length, done = g.steps.filter(s => s.completed).length;
+  const pct = total ? Math.round(done/total*100) : 0;
+  return `<div class="card goal-card">
+    <div class="goal-head">
+      <div class="goal-icon">${g.icon||'🎯'}</div>
+      <div style="flex:1">
+        <div class="goal-title">${esc(g.title)}</div>
+        ${g.description ? `<p class="goal-desc">${esc(g.description)}</p>` : ''}
+      </div>
+      <button class="icon-btn btn-danger" style="width:32px;height:32px;font-size:13px" data-delgoal="${g.id}">✕</button>
+    </div>
+    <div class="goal-progress">
+      <div class="top"><span>${total?pct+'%':'нет шагов'}</span><span>${done}/${total}</span></div>
+      <div class="bar"><i class="on" style="--p:${(pct/100).toFixed(3)}"></i></div>
+    </div>
+    <ul class="goal-steps">
+      ${g.steps.map(s => `<li class="${s.completed?'done':''}">
+        <button class="check ${s.completed?'on':''}" data-tg="${g.id}|${s.id}">${s.completed?'✓':''}</button>
+        <span style="flex:1">${esc(s.title)}</span>
+      </li>`).join('')}
+    </ul>
+  </div>`;
+}
+
+function renderPeriodicGoal(g){
+  ensurePeriodProgress(g);
+  const prog = getProgressInPeriod(g);
+  const target = g.target || PERIOD_INFO[g.period].target;
+  const pct = Math.min(100, Math.round(prog.length / target * 100));
+  const marked = isMarkedToday(g);
+  const daysLeft = periodDaysLeft(g.period);
+  const done = prog.length >= target;
+
+  return `<div class="card goal-card" style="border-left:3px solid ${done ? 'var(--moss)' : 'var(--amber)'}">
+    <div class="goal-head">
+      <div class="goal-icon">${g.icon||'📅'}</div>
+      <div style="flex:1">
+        <div class="goal-title">${esc(g.title)}</div>
+        <p class="goal-desc">
+          ${PERIOD_INFO[g.period].label} · ${done ? 'выполнено' : `осталось ${daysLeft} ${daysLeft===1?'день':daysLeft<5?'дня':'дней'}`}
+        </p>
+      </div>
+      <button class="icon-btn" data-period-edit="${g.id}" type="button" style="width:32px;height:32px;font-size:13px;background:transparent;border-color:transparent;color:var(--ink-mute)">✎</button>
+      <button class="icon-btn btn-danger" style="width:32px;height:32px;font-size:13px" data-delgoal="${g.id}">✕</button>
+    </div>
+    <div class="goal-progress" style="margin-top:12px">
+      <div class="top">
+        <span><b style="font-family:'Fraunces',serif;font-size:18px;color:${done ? 'var(--moss)' : 'var(--ink)'}">${prog.length}</b> / ${target}</span>
+        <span>${pct}%</span>
+      </div>
+      <div class="bar" style="height:8px"><i class="on" style="--p:${(pct/100).toFixed(3)}"></i></div>
+    </div>
+    <div style="margin-top:12px">
+      ${marked
+        ? `<button class="btn btn-ghost btn-full btn-sm" data-period-mark="${g.id}" type="button">✓ Отмечено сегодня · нажми чтобы снять</button>`
+        : `<button class="btn btn-primary btn-full btn-sm" data-period-mark="${g.id}" type="button">+ Отметить сегодня</button>`}
+    </div>
+    ${done ? '<div style="margin-top:10px;text-align:center;font-size:12px;color:var(--moss);font-weight:600">🎉 Цель периода выполнена</div>' : ''}
+  </div>`;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   РЕДАКТОР ЦЕЛИ
+   ═══════════════════════════════════════════════════════════════════ */
+function openGoalModal(editId){
+  const editGoal = editId ? N.S.navlife.goals.find(g => g.id === editId) : null;
+  const isEd = !!editGoal;
+
+  let steps = isEd && editGoal.steps ? editGoal.steps.map(s => s.title) : [''];
+  let period = isEd ? (editGoal.period || 'longterm') : 'longterm';
+  let target = isEd ? (editGoal.target || 4) : 4;
+
   openModal(`
     <div class="modal-handle"></div>
-    <div class="h2" style="margin-bottom:16px">Новая цель</div>
+    <div class="h2" style="margin-bottom:16px">${isEd ? 'Изменить цель' : 'Новая цель'}</div>
     <div class="field-row">
-      <div class="field" style="flex:0 0 70px"><label>Иконка</label><input id="gIcon" maxlength="2" value="🎯"></div>
-      <div class="field"><label>Название</label><input id="gTitle" placeholder="Например, Выучить английский"></div>
+      <div class="field" style="flex:0 0 70px"><label>Иконка</label><input id="gIcon" maxlength="2" value="${isEd ? (editGoal.icon || '🎯') : '🎯'}"></div>
+      <div class="field"><label>Название</label><input id="gTitle" value="${isEd ? esc(editGoal.title) : ''}" placeholder="Например, Спортзал 4 раза в неделю"></div>
     </div>
-    <div class="field"><label>Описание</label><textarea id="gDesc" placeholder="Зачем тебе эта цель"></textarea></div>
-    <div class="field"><label>Шаги</label>
+    <div class="field"><label>Описание</label><textarea id="gDesc" placeholder="Зачем тебе эта цель">${isEd ? esc(editGoal.description || '') : ''}</textarea></div>
+
+    <div class="field">
+      <label>Тип цели</label>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px">
+        ${[['longterm','🎯 Долгая'],['week','📅 Неделя'],['month','🗓 Месяц']].map(([k,l]) => `
+          <button type="button" data-period="${k}" style="
+            padding:10px 6px;border-radius:10px;font-size:12.5px;font-weight:600;
+            background:${period===k?'var(--moss)':'var(--paper)'};
+            color:${period===k?'#fff':'var(--ink)'};
+            border:1.5px solid ${period===k?'var(--moss)':'var(--line)'};
+            cursor:pointer;
+          ">${l}</button>`).join('')}
+      </div>
+    </div>
+
+    <div class="field" id="targetField" style="display:${period === 'longterm' ? 'none' : 'block'}">
+      <label>Сколько раз за ${period === 'week' ? 'неделю' : 'месяц'}</label>
+      <div style="display:flex;gap:6px;margin-top:6px">
+        ${[2,3,4,5,6,8,10,12,15,20,30].map(n => `
+          <button type="button" data-target="${n}" style="
+            padding:8px 10px;border-radius:8px;font-size:13px;font-weight:600;min-width:36px;
+            background:${target===n?'var(--moss)':'var(--paper)'};
+            color:${target===n?'#fff':'var(--ink)'};
+            border:1px solid ${target===n?'var(--moss)':'var(--line)'};
+            cursor:pointer;
+          ">${n}</button>`).join('')}
+        <input type="number" id="gTargetCustom" min="1" max="100" value="${target}" style="width:70px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font-size:13px">
+      </div>
+    </div>
+
+    <div class="field" id="stepsField" style="display:${period === 'longterm' ? 'block' : 'none'}">
+      <label>Шаги</label>
       <div id="gSteps"></div>
       <button class="btn btn-line btn-sm" id="gAddStep" type="button" style="margin-top:6px">+ Шаг</button>
     </div>
+
     <div style="display:flex;gap:10px;margin-top:8px">
       <button class="btn btn-ghost btn-full" id="gCancel" type="button">Отмена</button>
-      <button class="btn btn-primary btn-full" id="gSave" type="button">Сохранить</button>
+      <button class="btn btn-primary btn-full" id="gSave" type="button">${isEd ? 'Сохранить' : 'Создать'}</button>
     </div>`, m => {
-    const draw = () => {
-      m.querySelector('#gSteps').innerHTML = steps.map((s, i) => `<div style="display:flex;gap:6px;margin-bottom:6px">
+    const stepsEl = m.querySelector('#gSteps');
+    const periodBtns = Array.from(m.querySelectorAll('[data-period]'));
+    const targetBtns = Array.from(m.querySelectorAll('[data-target]'));
+    const targetField = m.querySelector('#targetField');
+    const stepsField = m.querySelector('#stepsField');
+    const customTarget = m.querySelector('#gTargetCustom');
+
+    function drawSteps(){
+      stepsEl.innerHTML = steps.map((s, i) => `<div style="display:flex;gap:6px;margin-bottom:6px">
         <input data-si="${i}" value="${esc(s)}" placeholder="Шаг" style="flex:1;border:1px solid var(--line);border-radius:9px;padding:8px 10px;font-size:13.5px;background:var(--surface);color:var(--ink)">
         <button class="icon-btn btn-danger" style="width:36px;height:36px;font-size:13px" data-sdel="${i}" type="button">✕</button>
       </div>`).join('');
       m.querySelectorAll('[data-si]').forEach(inp => inp.oninput = () => { steps[+inp.dataset.si] = inp.value; });
-      m.querySelectorAll('[data-sdel]').forEach(b => b.onclick = () => { steps.splice(+b.dataset.sdel, 1); draw(); });
+      m.querySelectorAll('[data-sdel]').forEach(b => b.onclick = () => { steps.splice(+b.dataset.sdel, 1); drawSteps(); });
+    }
+    drawSteps();
+
+    periodBtns.forEach(b => b.onclick = () => {
+      period = b.dataset.period;
+      periodBtns.forEach(x => {
+        const on = x.dataset.period === period;
+        x.style.background = on ? 'var(--moss)' : 'var(--paper)';
+        x.style.color = on ? '#fff' : 'var(--ink)';
+        x.style.borderColor = on ? 'var(--moss)' : 'var(--line)';
+      });
+      targetField.style.display = period === 'longterm' ? 'none' : 'block';
+      stepsField.style.display = period === 'longterm' ? 'block' : 'none';
+      if (period === 'week' && target === 4) target = 4;
+      if (period === 'month' && target === 4) target = 12;
+      customTarget.value = target;
+      targetBtns.forEach(x => {
+        const on = +x.dataset.target === target;
+        x.style.background = on ? 'var(--moss)' : 'var(--paper)';
+        x.style.color = on ? '#fff' : 'var(--ink)';
+        x.style.borderColor = on ? 'var(--moss)' : 'var(--line)';
+      });
+      N.SFX.tap();
+    });
+
+    targetBtns.forEach(b => b.onclick = () => {
+      target = +b.dataset.target;
+      customTarget.value = target;
+      targetBtns.forEach(x => {
+        const on = +x.dataset.target === target;
+        x.style.background = on ? 'var(--moss)' : 'var(--paper)';
+        x.style.color = on ? '#fff' : 'var(--ink)';
+        x.style.borderColor = on ? 'var(--moss)' : 'var(--line)';
+      });
+      N.SFX.tap();
+    });
+    customTarget.oninput = () => {
+      target = Math.max(1, Math.min(100, +customTarget.value || 1));
     };
-    draw();
-    m.querySelector('#gAddStep').onclick = () => { steps.push(''); draw(); };
+
+    m.querySelector('#gAddStep').onclick = () => { steps.push(''); drawSteps(); };
     m.querySelector('#gCancel').onclick = () => closeModal(m);
     m.querySelector('#gSave').onclick = () => {
       const title = m.querySelector('#gTitle').value.trim();
       if (!title){ toast('Введи название'); return; }
-      const st = steps.filter(s => s.trim()).map(s => ({id: uid('gstep'), title: s.trim(), completed:false, linkedScheduleItemId:null, linkedProgramId:null}));
-      N.S.navlife.goals.push({
-        id: uid('goal'), title, icon: m.querySelector('#gIcon').value || '🎯',
-        description: m.querySelector('#gDesc').value.trim(),
-        status:'active', createdAt: todayKey(), steps: st
-      });
-      saveState(); closeModal(m); go('goals'); toast('Цель добавлена');
+
+      if (period === 'longterm'){
+        const st = steps.filter(s => s.trim()).map(s => ({id: uid('gstep'), title: s.trim(), completed:false, linkedScheduleItemId:null, linkedProgramId:null}));
+        if (isEd){
+          Object.assign(editGoal, {
+            title, icon: m.querySelector('#gIcon').value || '🎯',
+            description: m.querySelector('#gDesc').value.trim(),
+            period: 'longterm',
+            steps: st
+          });
+        } else {
+          N.S.navlife.goals.push({
+            id: uid('goal'), title, icon: m.querySelector('#gIcon').value || '🎯',
+            description: m.querySelector('#gDesc').value.trim(),
+            period: 'longterm',
+            status:'active', createdAt: todayKey(), steps: st
+          });
+        }
+      } else {
+        if (isEd){
+          Object.assign(editGoal, {
+            title, icon: m.querySelector('#gIcon').value || '📅',
+            description: m.querySelector('#gDesc').value.trim(),
+            period, target,
+            steps: []
+          });
+        } else {
+          N.S.navlife.goals.push({
+            id: uid('goal'), title, icon: m.querySelector('#gIcon').value || '📅',
+            description: m.querySelector('#gDesc').value.trim(),
+            period, target,
+            status: 'active', createdAt: todayKey(),
+            progress: [],
+            steps: []
+          });
+        }
+      }
+      saveState(); closeModal(m); go('goals');
+      toast(isEd ? 'Обновлено' : 'Цель создана');
       if (window.Achievements) window.Achievements.check();
     };
   });
 }
 
+/* ═══ Программы ═══ */
 function renderPrograms(){
   const root = document.createElement('div');
   root.className = 'screen';
@@ -537,6 +797,7 @@ function openKnowledgeEditor(editId){
   });
 }
 
+/* ═══ Program runner (без изменений) ═══ */
 let runSession = null;
 function startProgramRun(programId, scheduleId){
   const p = N.S.navlife.programs.find(x => x.id === programId);

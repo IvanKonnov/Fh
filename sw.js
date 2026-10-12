@@ -1,4 +1,4 @@
-const CACHE = 'navlife-v14';
+const CACHE = 'navlife-v17';
 const ASSETS = [
   './', './index.html', './manifest.json', './icon.svg',
   './css/base.css', './css/skin.css', './css/modules.css',
@@ -7,8 +7,10 @@ const ASSETS = [
   './js/05-brain.js','./js/06-goals.js','./js/07-onboarding.js','./js/08-stats.js',
   './js/09-profile.js','./js/10-habits.js','./js/11-sleep.js','./js/12-mood.js',
   './js/13-reflection.js','./js/14-achievements.js','./js/15-freezer.js',
-  './js/16-feature-pack.js','./js/18-breathing.js','./js/19-vitamins.js',
-  './js/17-init.js'
+  './js/16-feature-pack.js','./js/17-init.js',
+  './js/18-breathing.js','./js/19-vitamins.js',
+  './js/20-habits-schedule-link.js','./js/22-reports.js',
+  './js/23-ics-export.js','./js/24-smart-reminders.js','./js/25-day-templates.js'
 ];
 
 self.addEventListener('install', e => {
@@ -47,8 +49,17 @@ self.addEventListener('fetch', e => {
 
 self.addEventListener('notificationclick', e => {
   e.notification.close();
-  e.waitUntil(clients.matchAll({ type:'window', includeUncontrolled:true }).then(list => {
-    for (const c of list) if ('focus' in c) return c.focus();
-    if (clients.openWindow) return clients.openWindow('./index.html');
-  }));
+  const data = e.notification.data || {};
+  e.waitUntil(
+    clients.matchAll({ type:'window', includeUncontrolled:true }).then(list => {
+      for (const c of list){
+        if ('focus' in c){
+          c.focus();
+          try { c.postMessage({ type:'notification-click', data }); } catch(err){}
+          return;
+        }
+      }
+      if (clients.openWindow) return clients.openWindow('./index.html');
+    })
+  );
 });

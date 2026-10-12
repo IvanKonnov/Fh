@@ -82,6 +82,9 @@ function migrateState(p){
   if (!Array.isArray(out.navlife.programs)) out.navlife.programs = [];
   if (!Array.isArray(out.navlife.baseRoutine)) out.navlife.baseRoutine = [];
   if (!Array.isArray(out.navlife.goals)) out.navlife.goals = [];
+  if (!out.navlife.habitLinks || typeof out.navlife.habitLinks !== 'object') out.navlife.habitLinks = {};
+  if (!Array.isArray(out.navlife.dayTemplates)) out.navlife.dayTemplates = [];
+  if (!out.meta.missedNotifSent || typeof out.meta.missedNotifSent !== 'object') out.meta.missedNotifSent = {};
   if (!Array.isArray(out.nutrition.vitamins)) out.nutrition.vitamins = [];
   if (!out.nutrition.vitaminLog || typeof out.nutrition.vitaminLog !== 'object') out.nutrition.vitaminLog = {};
   if (!out.breathing || typeof out.breathing !== 'object') out.breathing = { totalSessions: 0, totalMs: 0, sessions: [] };
