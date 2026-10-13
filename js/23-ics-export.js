@@ -1,4 +1,4 @@
-/* ═══ NAVLIFE · ICS EXPORT ═══ */
+/* ═══ NAVLIFE · ICS EXPORT · v2.0 ═══ */
 (function(){
 'use strict';
 const N = window.__nav;
@@ -8,7 +8,6 @@ const qs = (s, r=document) => r.querySelector(s);
 function pad(n){ return String(n).padStart(2,'0'); }
 
 function dateToICS(ds, time){
-  /* ds = 'YYYY-MM-DD', time = 'HH:MM' */
   const [y,m,d] = ds.split('-');
   const [h,mi] = time.split(':');
   return `${y}${m}${d}T${h}${mi}00`;
@@ -123,11 +122,19 @@ function openICSModal(){
   });
 }
 
+/* ═══ ФОЛБЭК-КНОПКА В ПРОФИЛЕ ═══
+   Ставится ТОЛЬКО если в новом дизайне профиля кнопки нет.
+   Новый профиль имеет id="openICS" в меню — тогда хук ничего не делает. */
 window.App.hooks.afterGo.push(name => {
   if (name !== 'profile') return;
   setTimeout(() => {
     const host = qs('#screens');
-    if (!host || host.querySelector('[data-ics-btn]')) return;
+    if (!host) return;
+
+    /* Если в новом профиле уже есть кнопка в меню — не вставляем дубликат */
+    if (host.querySelector('#openICS')) return;
+    if (host.querySelector('[data-ics-btn]')) return;
+
     const card = document.createElement('button');
     card.className = 'card tappable';
     card.setAttribute('data-ics-btn', '');
@@ -143,6 +150,7 @@ window.App.hooks.afterGo.push(name => {
       </div>`;
     card.onclick = () => { N.SFX.tap(); openICSModal(); };
 
+    /* Ищем карточку с Экспорт/Импорт — ставим после неё */
     const cards = host.querySelectorAll('.card');
     const dataCard = Array.from(cards).find(c => c.textContent.includes('Экспорт') && c.textContent.includes('Импорт'));
     if (dataCard && dataCard.parentNode){
@@ -154,5 +162,5 @@ window.App.hooks.afterGo.push(name => {
 });
 
 window.ICS = { open: openICSModal, generate: generateICS, download: downloadICS };
-console.log('[ICS] loaded');
+console.log('[ICS] v2.0 loaded');
 })();

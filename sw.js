@@ -1,4 +1,4 @@
-const CACHE = 'navlife-v17';
+const CACHE = 'navlife-v21';
 const ASSETS = [
   './', './index.html', './manifest.json', './icon.svg',
   './css/base.css', './css/skin.css', './css/modules.css',
@@ -10,7 +10,8 @@ const ASSETS = [
   './js/16-feature-pack.js','./js/17-init.js',
   './js/18-breathing.js','./js/19-vitamins.js',
   './js/20-habits-schedule-link.js','./js/22-reports.js',
-  './js/23-ics-export.js','./js/24-smart-reminders.js','./js/25-day-templates.js'
+  './js/23-ics-export.js','./js/24-smart-reminders.js','./js/25-day-templates.js',
+  './js/26-goals-v2.js'
 ];
 
 self.addEventListener('install', e => {
