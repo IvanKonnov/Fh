@@ -1,8 +1,10 @@
-/* ═══ NAVLIFE · SLEEP ═══ */
+/* ═══ NAVLIFE · SLEEP TRACKER · v2.2 · + Sleep Cycles (fixed crash) ═══ */
 (function(){
 'use strict';
 const N = window.__nav;
+if (!N){ console.error('[SLEEP] __nav not found'); return; }
 const { go, saveState, esc, todayKey, fmtDate, openModal, closeModal, toast, SFX, buzz } = N;
+const qs = (s, r=document) => r.querySelector(s);
 
 function get(ds){ return N.S.sleep[ds || todayKey()] || null; }
 function set(ds, data){ N.S.sleep = N.S.sleep || {}; N.S.sleep[ds] = { ...data, ts: Date.now() }; saveState(); }
@@ -11,12 +13,28 @@ function hoursBetween(bed, wake){
   if (!bed || !wake) return 0;
   const [bh, bm] = bed.split(':').map(Number);
   const [wh, wm] = wake.split(':').map(Number);
+  if ([bh,bm,wh,wm].some(isNaN)) return 0;
   let m1 = bh*60 + bm;
   let m2 = wh*60 + wm;
   if (m2 <= m1) m2 += 24*60;
   return +((m2 - m1) / 60).toFixed(1);
 }
 
+function fmtTime(m){
+  if (!isFinite(m)) return '--:--';
+  let total = m % (24*60);
+  if (total < 0) total += 24*60;
+  const h = Math.floor(total/60);
+  const min = Math.floor(total % 60);
+  return String(h).padStart(2,'0') + ':' + String(min).padStart(2,'0');
+}
+
+/* Проверка валидности времени HH:MM */
+function isValidTime(s){
+  return typeof s === 'string' && /^\d{2}:\d{2}$/.test(s);
+}
+
+/* ═══ Основная модалка сна ═══ */
 function openModal_(){
   const ds = todayKey();
   const cur = get(ds) || { bed:'23:00', wake:'07:00', quality:3 };
@@ -24,7 +42,10 @@ function openModal_(){
 
   openModal(`
     <div class="modal-handle"></div>
-    <div class="h2" style="margin-bottom:6px">😴 Сон</div>
+    <div class="between" style="margin-bottom:16px">
+      <div class="h2">😴 Сон</div>
+      <button class="btn btn-line btn-sm" id="calcCycles" type="button">🧮 Циклы сна</button>
+    </div>
     <p class="muted" style="margin-bottom:16px">Запись за ${new Date().toLocaleDateString('ru-RU',{day:'numeric',month:'long'})}</p>
 
     <div class="field-row">
@@ -53,12 +74,13 @@ function openModal_(){
     </div>
   `, m => {
     const updHours = () => {
-      const h = hoursBetween(m.querySelector('#sBed').value, m.querySelector('#sWake').value);
-      m.querySelector('#hoursBadge').textContent = h ? `${h} ч` : '—';
+      const h = hoursBetween(qs('#sBed',m).value, qs('#sWake',m).value);
+      qs('#hoursBadge',m).textContent = h ? `${h} ч` : '—';
     };
     updHours();
-    m.querySelector('#sBed').oninput = updHours;
-    m.querySelector('#sWake').oninput = updHours;
+    qs('#sBed',m).oninput = updHours;
+    qs('#sWake',m).oninput = updHours;
+    
     m.querySelectorAll('[data-q]').forEach(b => b.onclick = () => {
       quality = +b.dataset.q;
       SFX.tap(); buzz(6);
@@ -69,11 +91,12 @@ function openModal_(){
         x.style.borderColor = on ? 'var(--moss)' : 'var(--line)';
       });
     });
-    m.querySelector('#sCancel').onclick = () => closeModal(m);
-    m.querySelector('#sSave').onclick = () => {
-      const bedV = m.querySelector('#sBed').value;
-      const wakeV = m.querySelector('#sWake').value;
-      if (!bedV || !wakeV){ toast('Укажи время'); return; }
+    
+    qs('#sCancel',m).onclick = () => closeModal(m);
+    qs('#sSave',m).onclick = () => {
+      const bedV = qs('#sBed',m).value;
+      const wakeV = qs('#sWake',m).value;
+      if (!isValidTime(bedV) || !isValidTime(wakeV)){ toast('Укажи время'); return; }
       const hours = hoursBetween(bedV, wakeV);
       set(ds, { bed: bedV, wake: wakeV, quality, hours });
       SFX.ok();
@@ -81,6 +104,110 @@ function openModal_(){
       closeModal(m); go(N.currentScreen || 'today');
       toast('Сон записан');
     };
+
+    qs('#calcCycles',m).onclick = () => {
+      const wakeVal = qs('#sWake',m).value || '07:00';
+      closeModal(m);
+      setTimeout(() => openCycleCalculator(wakeVal), 150);
+    };
+  });
+}
+
+/* ═══ Калькулятор циклов сна ═══ */
+function openCycleCalculator(initialWake) {
+  let wakeTime = isValidTime(initialWake) ? initialWake : '07:00';
+
+  function computeOptions(wakeStr) {
+    if (!isValidTime(wakeStr)) return [];
+    const [wh, wm] = wakeStr.split(':').map(Number);
+    if (isNaN(wh) || isNaN(wm)) return [];
+    const wakeMin = wh * 60 + wm;
+    const opts = [];
+    for (let cycles = 6; cycles >= 3; cycles--) {
+      const totalSleepMin = cycles * 90;
+      let bedMin = wakeMin - totalSleepMin - 15;
+      if (bedMin < 0) bedMin += 24 * 60;
+      opts.push({
+        cycles,
+        totalMins: totalSleepMin,
+        hoursText: `${Math.floor(totalSleepMin/60)} ч${totalSleepMin%60 ? ' '+(totalSleepMin%60)+' мин' : ''}`,
+        bedTime: fmtTime(bedMin),
+        bedMin
+      });
+    }
+    return opts;
+  }
+
+  function renderOptions() {
+    const opts = computeOptions(wakeTime);
+    if (!opts.length){
+      return `<div class="muted" style="text-align:center;padding:16px;font-size:13px">Выбери корректное время подъёма</div>`;
+    }
+    const now = new Date();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+
+    return opts.map((o) => {
+      const isBest = o.cycles === 5 || o.cycles === 6;
+      const diff = (o.bedMin - nowMin + 24*60) % (24*60);
+      let waitText = '';
+      if (diff > 0 && diff <= 60) waitText = `через ${diff} мин`;
+      else if (diff > 60) waitText = `через ${Math.floor(diff/60)} ч ${diff%60} мин`;
+
+      return `
+        <div style="padding:14px 16px;border-radius:12px;border:1.5px solid ${isBest ? 'var(--moss)' : 'var(--line)'};background:${isBest ? 'linear-gradient(135deg,var(--moss-soft),var(--surface-raised))' : 'var(--paper)'};display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:13px;font-weight:700;color:${isBest ? 'var(--moss)' : 'var(--ink)'};margin-bottom:4px">${o.cycles} циклов · ${o.hoursText}</div>
+            <div style="font-size:11.5px;color:var(--ink-soft)">
+              ${isBest ? '✨ Оптимально' : 'Можно'}${waitText ? ` · ${waitText}` : ''}
+            </div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-family:'Fraunces',serif;font-size:26px;font-weight:600;color:${isBest ? 'var(--moss)' : 'var(--ink)'};line-height:1">${o.bedTime}</div>
+            <div style="font-size:10.5px;color:var(--ink-mute);margin-top:2px">лечь спать</div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  const layer = openModal(`
+    <div class="modal-handle"></div>
+    <div class="h2" style="margin-bottom:6px">🧮 Циклы сна</div>
+    <p class="muted" style="margin-bottom:16px">Рассчитай идеальное время отхода ко сну</p>
+
+    <div style="padding:12px 14px;background:var(--moss-soft);border-radius:12px;margin-bottom:16px">
+      <div class="h3" style="font-size:14px;margin-bottom:6px;color:var(--moss)">Что такое цикл сна?</div>
+      <p style="font-size:12.5px;color:var(--moss);line-height:1.55;margin:0">
+        Сон состоит из циклов по <b>~90 минут</b>. Каждый цикл — это погружение в глубокий сон и подъём к поверхностному.
+        Если проснуться в конце цикла, ты почувствуешь себя бодрым. Если в середине — будет чувство разбитости.
+        Приложение рассчитывает время с учётом того, что на засыпание уходит <b>15 минут</b>.
+      </p>
+    </div>
+
+    <div class="field">
+      <label>Во сколько нужно встать?</label>
+      <input id="calcWake" type="time" value="${wakeTime}" style="width:100%;padding:12px;font-size:20px;text-align:center;font-weight:600;font-family:'Fraunces',serif;border:1.5px solid var(--moss);border-radius:12px;background:var(--surface);color:var(--ink)">
+    </div>
+
+    <div class="tiny" style="margin-bottom:10px;letter-spacing:.08em">ИДЕАЛЬНОЕ ВРЕМЯ ДЛЯ СНА</div>
+    <div id="ccOptions" style="display:grid;gap:8px;margin-bottom:16px">${renderOptions()}</div>
+
+    <button class="btn btn-primary btn-full btn-lg" id="ccDone" type="button">Понятно</button>
+  `, m => {
+    const input = m.querySelector('#calcWake');
+    const optionsEl = m.querySelector('#ccOptions');
+
+    /* Обновляем ТОЛЬКО список, поле ввода не трогаем — фикс краша */
+    const update = () => {
+      const v = input.value;
+      if (!isValidTime(v)) return;
+      wakeTime = v;
+      optionsEl.innerHTML = renderOptions();
+    };
+    input.addEventListener('input', update);
+    input.addEventListener('change', update);
+
+    m.querySelector('#ccDone').onclick = () => closeModal(layer);
   });
 }
 
@@ -163,5 +290,6 @@ function weekChart(){
     </div>`;
 }
 
-window.Sleep = { get, set, open: openModal_, todayCard, correlationInsight, weekChart };
+window.Sleep = { get, set, open: openModal_, openCalc: openCycleCalculator, todayCard, correlationInsight, weekChart };
+console.log('[Sleep] v2.2 loaded');
 })();

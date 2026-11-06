@@ -1,9 +1,9 @@
-const CACHE = 'navlife-v21';
+const CACHE = 'navlife-v22';
 const ASSETS = [
   './', './index.html', './manifest.json', './icon.svg',
   './css/base.css', './css/skin.css', './css/modules.css',
-  './js/00-nutrition-data.js',
-  './js/01-core.js','./js/02-home.js','./js/03-schedule.js','./js/04-nutrition.js',
+  './js/00-nutrition-data.js', './js/00-haptics-sound.js', './js/01-core.js',
+  './js/02-home.js','./js/03-schedule.js','./js/04-nutrition.js',
   './js/05-brain.js','./js/06-goals.js','./js/07-onboarding.js','./js/08-stats.js',
   './js/09-profile.js','./js/10-habits.js','./js/11-sleep.js','./js/12-mood.js',
   './js/13-reflection.js','./js/14-achievements.js','./js/15-freezer.js',
@@ -11,7 +11,9 @@ const ASSETS = [
   './js/18-breathing.js','./js/19-vitamins.js',
   './js/20-habits-schedule-link.js','./js/22-reports.js',
   './js/23-ics-export.js','./js/24-smart-reminders.js','./js/25-day-templates.js',
-  './js/26-goals-v2.js'
+  './js/26-goals-v2.js',
+  './js/27-ux-enhancements.js','./js/28-auto-schedule.js','./js/29-visual-extras.js',
+  './js/30-achievement-rarity.js','./js/31-senior-comparison.js'
 ];
 
 self.addEventListener('install', e => {

@@ -16,7 +16,33 @@
     { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
   ],
   "shortcuts": [
-    { "name": "Тренировка мозга", "short_name": "Мозг", "url": "./index.html", "icons": [{ "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml" }] },
-    { "name": "Привычки", "short_name": "Привычки", "url": "./index.html", "icons": [{ "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml" }] }
+    {
+      "name": "💧 +200 мл воды",
+      "short_name": "+Вода",
+      "description": "Добавить 200 мл воды в дневник",
+      "url": "./index.html?action=water",
+      "icons": [{ "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "✅ Отметить привычку",
+      "short_name": "Привычка",
+      "description": "Открыть экран привычек",
+      "url": "./index.html?action=habit",
+      "icons": [{ "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "🧠 Быстрая тренировка",
+      "short_name": "Тренировка",
+      "description": "Открыть тренажёр мозга",
+      "url": "./index.html?action=brain",
+      "icons": [{ "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "🎯 Новая цель",
+      "short_name": "Цель",
+      "description": "Создать новую цель",
+      "url": "./index.html?action=goal",
+      "icons": [{ "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    }
   ]
 }
