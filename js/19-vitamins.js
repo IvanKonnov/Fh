@@ -1,4 +1,4 @@
-/* ═══ NAVLIFE · VITAMINS/BADS · v3.0 · с пищевой ценностью ═══ */
+/* ═══ NAVLIFE · VITAMINS/BADS · v3.2 · clean data ═══ */
 (function(){
 'use strict';
 const N = window.__nav;
@@ -22,7 +22,6 @@ function currentDate(){
   return dv || N.todayKey();
 }
 
-/* ═══ Пищевая ценность за день от принятых витаминов ═══ */
 function vitaminNutrition(ds){
   ensure();
   const vitamins = N.S.nutrition.vitamins;
@@ -39,7 +38,6 @@ function vitaminNutrition(ds){
   return { kcal, p, f, c, count: log.length };
 }
 
-/* ═══ HTML блока ═══ */
 function sectionHTML(){
   ensure();
   const ds = currentDate();
@@ -111,7 +109,6 @@ function sectionHTML(){
   `;
 }
 
-/* ═══ Редактор ═══ */
 function openEditor(editId){
   ensure();
   const v = editId ? N.S.nutrition.vitamins.find(x => x.id === editId) : null;
@@ -204,7 +201,6 @@ function openEditor(editId){
   });
 }
 
-/* ═══ Обработка кликов ═══ */
 function handleClick(e){
   const target = e.target;
   if (!target) return false;
@@ -238,79 +234,10 @@ function handleClick(e){
   return false;
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   ПАТЧ ОТОБРАЖЕНИЯ ДНЕВНОГО ИТОГА
-   После рендера экрана Питания — добавляем значения витаминов
-   прямо в кольцо КБЖУ, прогресс-бары макро и текст «осталось».
-   ═══════════════════════════════════════════════════════════════════ */
-function applyVitaminTotalsToDOM(){
-  const ds = currentDate();
-  const vn = vitaminNutrition(ds);
-  if (!vn.kcal && !vn.p && !vn.f && !vn.c) return;
-
-  const host = qs('#screens');
-  if (!host) return;
-
-  const g = N.S.nutrition.goals;
-
-  /* — Большое число ккал — */
-  const bigEl = host.querySelector('.kcal-ring-inner .big');
-  if (bigEl && vn.kcal){
-    const base = parseInt(bigEl.textContent.replace(/\D/g, ''), 10) || 0;
-    const total = base + Math.round(vn.kcal);
-    bigEl.textContent = String(total);
-
-    /* — Текст под числом — */
-    const leftEl = host.querySelector('.kcal-ring-inner .left');
-    if (leftEl){
-      if (total > g.calories){
-        leftEl.textContent = `+${total - g.calories} сверх`;
-      } else {
-        leftEl.textContent = `осталось ${g.calories - total}`;
-      }
-    }
-  }
-
-  /* — Полоски макро — */
-  const barVals = host.querySelectorAll('.macro-bar-val');
-  if (barVals.length >= 3){
-    const pairs = [
-      { idx: 0, add: vn.p, goal: g.protein },
-      { idx: 1, add: vn.f, goal: g.fat },
-      { idx: 2, add: vn.c, goal: g.carbs }
-    ];
-    pairs.forEach(p => {
-      if (!p.add) return;
-      const el = barVals[p.idx];
-      const cur = parseInt((el.textContent || '0').split('/')[0].replace(/\D/g, ''), 10) || 0;
-      el.textContent = `${cur + Math.round(p.add)}/${p.goal}г`;
-    });
-
-    /* — Полоски прогресса — */
-    const fills = host.querySelectorAll('.macro-bar-fill');
-    const pairsFill = [
-      { idx: 0, val: (parseInt((barVals[0].textContent||'0').split('/')[0].replace(/\D/g,''),10)||0), goal: g.protein },
-      { idx: 1, val: (parseInt((barVals[1].textContent||'0').split('/')[0].replace(/\D/g,''),10)||0), goal: g.fat },
-      { idx: 2, val: (parseInt((barVals[2].textContent||'0').split('/')[0].replace(/\D/g,''),10)||0), goal: g.carbs }
-    ];
-    pairsFill.forEach(p => {
-      if (fills[p.idx]){
-        const pct = Math.min(100, Math.round(p.val / Math.max(1, p.goal) * 100));
-        fills[p.idx].style.width = pct + '%';
-      }
-    });
-  }
-}
-
-/* ═══ Инъекция блока в Питание ═══ */
 function injectIntoNutrition(){
   const host = qs('#screens');
   if (!host) return;
-  if (host.querySelector('[data-vitamins-block]')){
-    /* Блок уже есть — просто обновляем кольцо */
-    setTimeout(applyVitaminTotalsToDOM, 20);
-    return;
-  }
+  if (host.querySelector('[data-vitamins-block]')) return;
 
   const wrapper = document.createElement('div');
   wrapper.innerHTML = sectionHTML();
@@ -331,21 +258,16 @@ function injectIntoNutrition(){
   }
 
   block.addEventListener('click', e => { if (handleClick(e)) e.stopPropagation(); }, true);
-
-  /* Обновляем итог с задержкой, чтобы рендер уже был готов */
-  setTimeout(applyVitaminTotalsToDOM, 30);
 }
 
-/* ═══ Регистрация ═══ */
 window.Vitamins = {
   openEditor,
   vitaminNutrition,
-  /* Старый API — заглушки для совместимости с 04-nutrition.js */
   renderSection: () => '',
   handleClick: () => false
 };
 
 window.App.hooks.afterGo.push(name => {
-  if (name === 'nutrition') setTimeout(injectIntoNutrition, 60);
+  if (name === 'nutrition') injectIntoNutrition();
 });
 })();

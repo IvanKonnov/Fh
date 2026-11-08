@@ -1,4 +1,4 @@
-/* ═══ NAVLIFE · SCHEDULE (День / Неделя / Месяц) ═══ */
+/* ═══ NAVLIFE · SCHEDULE (День / Неделя / Месяц) · v2.1 (base edit) ═══ */
 (function(){
 'use strict';
 const N = window.__nav;
@@ -92,6 +92,7 @@ function renderDayHtml(){
         ${N.S.navlife.baseRoutine.map(b => `<li>
           <time>${b.startTime}</time>
           <span style="flex:1">${esc(b.title)}${b.programTitle ? ` <span class="tag-chip program" style="margin-left:6px">${esc(b.programTitle)}</span>` : ''}</span>
+          <button class="icon-btn" style="width:30px;height:30px;font-size:12px" data-editbase="${b.id}" type="button">✎</button>
           <button class="icon-btn btn-danger" style="width:30px;height:30px;font-size:12px" data-delbase="${b.id}" type="button">✕</button>
         </li>`).join('') || '<li class="muted">Пока нет пунктов.</li>'}
       </ul>
@@ -113,7 +114,7 @@ function bindDayHandlers(root){
   const tj = $('#todayJump', root);
   if (tj) tj.onclick = () => { N.S.navlife.viewDate = todayKey(); saveState(); go('schedule'); };
   $('#addEvent', root).onclick = () => openEventModal(null);
-  $('#addBase', root).onclick = openBaseModal;
+  $('#addBase', root).onclick = () => openBaseModal(null);
 
   root.addEventListener('click', e => {
     if (root._dragJustEnded){ root._dragJustEnded = false; return; }
@@ -132,6 +133,11 @@ function bindDayHandlers(root){
         N.S.navlife.schedule = N.S.navlife.schedule.filter(i => i.id !== it.id);
         saveState(); go('schedule');
       }
+      return;
+    }
+    const eb = e.target.closest('[data-editbase]');
+    if (eb){
+      openBaseModal(eb.dataset.editbase);
       return;
     }
     const db = e.target.closest('[data-delbase]');
@@ -526,36 +532,70 @@ function openEventModal(editId){
     };
   });
 }
-function openBaseModal(){
+
+function openBaseModal(editId){
+  const b = editId ? N.S.navlife.baseRoutine.find(x => x.id === editId) : null;
+  const isEd = !!b;
   openModal(`
     <div class="modal-handle"></div>
-    <div class="h2" style="margin-bottom:16px">Пункт базового дня</div>
-    <div class="field"><label>Название</label><input id="bTitle" placeholder="Например, Зарядка"></div>
+    <div class="h2" style="margin-bottom:16px">${isEd ? 'Изменить пункт' : 'Пункт базового дня'}</div>
+    <div class="field"><label>Название</label><input id="bTitle" value="${isEd ? esc(b.title) : ''}" placeholder="Например, Зарядка"></div>
     <div class="field-row">
-      <div class="field"><label>Начало</label><input id="bStart" type="time" value="08:00"></div>
-      <div class="field"><label>Конец</label><input id="bEnd" type="time" value="08:15"></div>
+      <div class="field"><label>Начало</label><input id="bStart" type="time" value="${isEd ? b.startTime : '08:00'}"></div>
+      <div class="field"><label>Конец</label><input id="bEnd" type="time" value="${isEd ? b.endTime : '08:15'}"></div>
     </div>
     <div class="field"><label>Программа</label>
-      <select id="bProg"><option value="">— нет —</option>${N.S.navlife.programs.map(p => `<option value="${esc(p.title)}">${esc(p.title)}</option>`).join('')}</select>
+      <select id="bProg">
+        <option value="">— нет —</option>
+        ${N.S.navlife.programs.map(p => `<option value="${esc(p.title)}" ${isEd && b.programTitle === p.title ? 'selected' : ''}>${esc(p.title)}</option>`).join('')}
+      </select>
     </div>
     <div style="display:flex;gap:10px;margin-top:8px">
       <button class="btn btn-ghost btn-full" id="bCancel" type="button">Отмена</button>
-      <button class="btn btn-primary btn-full" id="bSave" type="button">Добавить</button>
+      <button class="btn btn-primary btn-full" id="bSave" type="button">${isEd ? 'Сохранить' : 'Добавить'}</button>
     </div>`, m => {
     m.querySelector('#bCancel').onclick = () => closeModal(m);
     m.querySelector('#bSave').onclick = () => {
       const title = m.querySelector('#bTitle').value.trim();
       if (!title){ toast('Введи название'); return; }
-      N.S.navlife.baseRoutine.push({
-        id: uid('base'), title,
-        startTime: m.querySelector('#bStart').value,
-        endTime: m.querySelector('#bEnd').value,
-        programTitle: m.querySelector('#bProg').value || undefined
-      });
-      N.S.navlife.baseRoutine.sort((a,b) => toMin(a.startTime) - toMin(b.startTime));
+      const startTime = m.querySelector('#bStart').value;
+      const endTime = m.querySelector('#bEnd').value;
+      const programTitle = m.querySelector('#bProg').value || undefined;
+      
+      if (isEd) {
+        b.title = title;
+        b.startTime = startTime;
+        b.endTime = endTime;
+        b.programTitle = programTitle;
+        
+        // Обновляем существующие незавершенные события в расписании
+        const today = todayKey();
+        N.S.navlife.schedule.forEach(s => {
+          if (s.fromBase && s.baseRef === b.id && s.date >= today && !s.completed) {
+            s.title = title;
+            s.startTime = startTime;
+            s.endTime = endTime;
+            if (programTitle) {
+               const prog = N.S.navlife.programs.find(p => p.title === programTitle);
+               s.programId = prog ? prog.id : null;
+            } else {
+               s.programId = null;
+            }
+          }
+        });
+      } else {
+        N.S.navlife.baseRoutine.push({
+          id: uid('base'), title,
+          startTime: startTime,
+          endTime: endTime,
+          programTitle: programTitle
+        });
+        N.S.navlife.baseRoutine.sort((a,b) => toMin(a.startTime) - toMin(b.startTime));
+      }
+      
       if (N.syncBaseEvents) N.syncBaseEvents();
       saveState(); closeModal(m); go('schedule');
-      toast('Добавлено');
+      toast(isEd ? 'Обновлено' : 'Добавлено');
     };
   });
 }

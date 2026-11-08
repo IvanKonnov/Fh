@@ -1,17 +1,26 @@
-/* ═══ NAVLIFE · SMART REMINDERS · напоминания о пропущенном ═══ */
+/* ═══ NAVLIFE · SMART REMINDERS · v2.1 (no interruption) ═══ */
 (function(){
 'use strict';
 const N = window.__nav;
 if (!N){ console.error('[SMART] __nav not found'); return; }
 
-const CHECK_INTERVAL = 60000; // раз в минуту
+const CHECK_INTERVAL = 60000;
 const MISS_AFTER_MIN = 15;
 
 function pad2(n){ return String(n).padStart(2,'0'); }
 
-/* ═══ Проверка: есть ли пропущенное событие ═══ */
+/* Проверка: занят ли пользователь активностью (программа/мозг/дыхание) */
+function isUserBusy(){
+  if (window.runSession) return true;
+  if (window.__exCleanup) return true;
+  if (document.querySelector('#breath-screen')) return true;
+  if (document.querySelector('#nav').classList.contains('hidden')) return true;
+  return false;
+}
+
 function findMissed(){
   if (!N.S.shared.notifications) return null;
+  if (isUserBusy()) return null; // Не ищем пропущенное во время активности
   const ds = N.todayKey();
   const now = new Date();
   const nowMin = now.getHours()*60 + now.getMinutes();
@@ -37,12 +46,10 @@ function findMissed(){
   return null;
 }
 
-/* ═══ Отправить уведомление ═══ */
 async function checkAndNotify(){
   const ev = findMissed();
   if (!ev) return;
 
-  /* Если браузер не поддерживает — просто покажем тост и модалку */
   const canNotif = ('Notification' in window) && Notification.permission === 'granted';
 
   if (canNotif){
@@ -57,23 +64,21 @@ async function checkAndNotify(){
       });
       n.onclick = () => {
         window.focus();
-        openMissedModal(ev);
+        if (!isUserBusy()) openMissedModal(ev);
         n.close();
       };
     } catch(e){}
   }
 
-  /* Если приложение открыто — показать модалку сразу */
-  if (!document.hidden){
+  if (!document.hidden && !isUserBusy()){
     openMissedModal(ev);
   }
 }
 
-/* ═══ Модалка с 3 вариантами ═══ */
 function openMissedModal(ev){
   if (document.querySelector('[data-missed-modal]')) return;
-  /* Не показываем в настройках/модалках */
   if (document.querySelector('#modal-root.open')) return;
+  if (isUserBusy()) return; // Дополнительная страховка
 
   const layer = N.openModal(`
     <div class="modal-handle" data-missed-modal></div>
@@ -99,7 +104,6 @@ function openMissedModal(ev){
       N.toast('Отмечено ✓');
     };
     m.querySelector('[data-missed-snooze]').onclick = () => {
-      /* Сдвигаем на 1 час вперёд */
       const [h, mm] = ev.startTime.split(':').map(Number);
       const [eh, em] = ev.endTime.split(':').map(Number);
       const dur = (eh*60 + em) - (h*60 + mm);
@@ -108,7 +112,6 @@ function openMissedModal(ev){
       const fmt = (t) => pad2(Math.floor(t/60)%24) + ':' + pad2(t%60);
       ev.startTime = fmt(newStart);
       ev.endTime = fmt(newEnd);
-      /* Сбрасываем метку уведомления — вдруг опять просрочится */
       const sent = N.S.meta.missedNotifSent || {};
       delete sent[`${ev.id}|${ev.date}`];
       N.saveState();
@@ -116,7 +119,6 @@ function openMissedModal(ev){
       N.toast(`Отложено до ${ev.startTime}`);
     };
     m.querySelector('[data-missed-skip]').onclick = () => {
-      /* Помечаем как completed с пометкой skipped */
       ev.completed = true;
       ev.skipped = true;
       N.saveState();
@@ -126,9 +128,8 @@ function openMissedModal(ev){
   });
 }
 
-/* ═══ Запуск ═══ */
 setInterval(checkAndNotify, CHECK_INTERVAL);
 setTimeout(checkAndNotify, 8000);
 
-console.log('[Smart Reminders] loaded');
+console.log('[Smart Reminders] v2.1 (no interruption) loaded');
 })();

@@ -1,4 +1,4 @@
-/* ═══ NAVLIFE · HABITS ═══ */
+/* ═══ NAVLIFE · HABITS · v2.1 (Smart Empty) ═══ */
 (function(){
 'use strict';
 const N = window.__nav;
@@ -117,15 +117,31 @@ function renderHabits(){
     ${habits.length ? `<div class="habits-grid">${habits.map(h => habitCardHtml(h)).join('')}</div>`
                     : `<div class="card" style="text-align:center;padding:40px 24px">
                          <div style="font-size:44px;margin-bottom:10px">✅</div>
-                         <div class="h2" style="margin-bottom:6px">Пока нет привычек</div>
-                         <p class="muted" style="margin-bottom:16px">Начни с одной. Например «Вода» или «10 страниц».</p>
-                         <button class="btn btn-primary" id="addFirstHabit" type="button">+ Добавить привычку</button>
+                         <div class="h2" style="margin-bottom:6px">У тебя пока нет привычек</div>
+                         <p class="muted" style="margin-bottom:20px;max-width:280px;margin-left:auto;margin-right:auto">
+                           Обычно люди начинают с двух простых: <b>Вода</b> и <b>10 страниц</b>. Добавим?
+                         </p>
+                         <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+                           <button class="btn btn-primary" id="addPresetHabits" type="button">✨ Добавить эти две</button>
+                           <button class="btn btn-ghost" id="addFirstHabit" type="button">Выбрать свою</button>
+                         </div>
                        </div>`}
     <div style="height:20px"></div>`;
 
   root.querySelector('#addHabit').onclick = () => openEditModal(null);
   const af = root.querySelector('#addFirstHabit');
   if (af) af.onclick = () => openEditModal(null);
+
+  const presetBtn = root.querySelector('#addPresetHabits');
+  if (presetBtn) presetBtn.onclick = () => {
+    N.S.habits = [
+      { id: uid('hab'), emoji:'💧', title:'Вода',     target:8, log:{}, createdAt: todayKey() },
+      { id: uid('hab'), emoji:'📖', title:'10 страниц',target:1, log:{}, createdAt: todayKey() }
+    ];
+    saveState(); SFX.ok(); buzz(12);
+    go('habits');
+    toast('Привычки добавлены!');
+  };
 
   root.addEventListener('click', e => {
     const card = e.target.closest('[data-habit-id]');

@@ -1,4 +1,4 @@
-/* ═══ NAVLIFE · DAY TEMPLATES · v2.0 · с полной заменой дня ═══ */
+/* ═══ NAVLIFE · DAY TEMPLATES · v2.1 · sync injection ═══ */
 (function(){
 'use strict';
 const N = window.__nav;
@@ -59,29 +59,19 @@ function defaultTemplates(){
   ];
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   ПОЛНАЯ ЗАМЕНА ДНЯ
-   1. Удаляем ВСЕ события дня (включая базовые, повторяющиеся, свои)
-   2. Ставим baseSkip на все пункты baseRoutine для этой даты —
-      чтобы ensureBaseForDate НЕ генерировала их снова
-   3. Добавляем события из шаблона
-   ═══════════════════════════════════════════════════════════════════ */
 function replaceDay(dateStr, templateId){
   ensure();
   const tpl = N.S.navlife.dayTemplates.find(t => t.id === templateId);
   if (!tpl) return { added: 0, removed: 0 };
 
-  /* 1. Удаляем все события этого дня */
   const before = N.S.navlife.schedule.filter(i => i.date === dateStr).length;
   N.S.navlife.schedule = N.S.navlife.schedule.filter(i => i.date !== dateStr);
 
-  /* 2. Помечаем все baseRoutine как skip для этого дня */
   N.S.navlife.baseSkip = N.S.navlife.baseSkip || {};
   (N.S.navlife.baseRoutine || []).forEach(b => {
     N.S.navlife.baseSkip[`${dateStr}|${b.id}`] = true;
   });
 
-  /* 3. Добавляем события шаблона */
   let added = 0;
   tpl.items.forEach(item => {
     N.S.navlife.schedule.push({
@@ -106,7 +96,6 @@ function replaceDay(dateStr, templateId){
   return { added, removed: before };
 }
 
-/* Снять все skip на этот день — на случай отката */
 function clearDaySkip(dateStr){
   ensure();
   const baseSkip = N.S.navlife.baseSkip || {};
@@ -116,7 +105,6 @@ function clearDaySkip(dateStr){
   N.saveState();
 }
 
-/* ═══ Модалка ═══ */
 function openTemplatesModal(dateStr){
   ensure();
   dateStr = dateStr || N.S.navlife.viewDate || N.todayKey();
@@ -187,7 +175,6 @@ function openTemplatesModal(dateStr){
   });
 }
 
-/* ═══ Редактор шаблона ═══ */
 function openEditTemplate(templateId, dateStr){
   ensure();
   const tpl = templateId ? N.S.navlife.dayTemplates.find(t => t.id === templateId) : null;
@@ -282,30 +269,29 @@ function openEditTemplate(templateId, dateStr){
   });
 }
 
-/* ═══ Кнопка в Делах ═══ */
+/* ═══ Кнопка в Делах — СИНХРОННО (без setTimeout → нет сжатия) ═══ */
 window.App.hooks.afterGo.push(name => {
   if (name !== 'schedule') return;
-  setTimeout(() => {
-    const host = qs('#screens');
-    if (!host) return;
-    if (host.querySelector('[data-tpl-btn]')) return;
-    const switcher = host.querySelector('[data-view-switch]');
-    if (!switcher) return;
 
-    const btn = document.createElement('button');
-    btn.setAttribute('data-tpl-btn', '');
-    btn.type = 'button';
-    btn.className = 'btn btn-line btn-sm';
-    btn.style.cssText = 'width:100%;margin-bottom:14px';
-    btn.innerHTML = '📋 Шаблоны дня';
-    btn.onclick = () => {
-      N.SFX.tap();
-      openTemplatesModal(N.S.navlife.viewDate);
-    };
-    switcher.parentNode.insertBefore(btn, switcher.nextSibling);
-  }, 60);
+  const host = qs('#screens');
+  if (!host) return;
+  if (host.querySelector('[data-tpl-btn]')) return;
+  const switcher = host.querySelector('[data-view-switch]');
+  if (!switcher) return;
+
+  const btn = document.createElement('button');
+  btn.setAttribute('data-tpl-btn', '');
+  btn.type = 'button';
+  btn.className = 'btn btn-line btn-sm';
+  btn.style.cssText = 'width:100%;margin-bottom:14px';
+  btn.innerHTML = '📋 Шаблоны дня';
+  btn.onclick = () => {
+    N.SFX.tap();
+    openTemplatesModal(N.S.navlife.viewDate);
+  };
+  switcher.parentNode.insertBefore(btn, switcher.nextSibling);
 });
 
 window.DayTemplates = { open: openTemplatesModal, replace: replaceDay, clearDaySkip };
-console.log('[Day Templates] v2.0 loaded');
+console.log('[Day Templates] v2.1 (sync) loaded');
 })();

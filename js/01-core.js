@@ -1,4 +1,4 @@
-/* ═══ NAVLIFE · CORE · v3.5 ═══ */
+/* ═══ NAVLIFE · CORE · v3.7 ═══ */
 'use strict';
 
 const $  = (s, r=document) => r.querySelector(s);
@@ -122,7 +122,17 @@ function resetState(){
 function applyTheme(){
   document.documentElement.dataset.theme = S.shared.theme;
   const m = document.querySelector('meta[name="theme-color"]');
-  if (m) m.content = S.shared.theme === 'dark' ? '#000000' : '#EDEFEA';
+  if (m) {
+    if (S.shared.theme === 'dark' || S.shared.theme === 'night') {
+      m.content = '#000000';
+    } else if (S.shared.theme === 'forest') {
+      m.content = '#E5EDE7';
+    } else if (S.shared.theme === 'sunset') {
+      m.content = '#FFF0E6';
+    } else {
+      m.content = '#EDEFEA';
+    }
+  }
 }
 function avatarHtml(avatar, size=48){
   if (avatar && String(avatar).startsWith('data:')){
@@ -237,36 +247,79 @@ function go(name){
   if (window.__exCleanup){ try{ window.__exCleanup(); }catch(e){} window.__exCleanup = null; }
   if (window.__queue) window.__queue = [];
   closeAllModals();
+  
   const host = $('#screens');
-  host.innerHTML = '';
+  if (!host) {
+    console.error('[go] #screens not found');
+    return;
+  }
+
+  const isSameScreen = currentScreen === name;
+  
+  // 1. Запоминаем скролл и открытые карточки
+  const currentScroll = window.scrollY;
+  let openMeals = [];
+  if (isSameScreen) {
+    document.querySelectorAll('.meal-card.open').forEach(el => {
+      openMeals.push(el.getAttribute('data-meal'));
+    });
+  }
+
   const noNav = ['onboarding','goals','programs','knowledge','levels','achievements'];
   $('#nav').classList.toggle('hidden', noNav.includes(name));
 
   const fn = App.screens[name] || App.screens['today'];
-  if (!fn){ console.error('[go] unknown:', name); return; }
+  if (!fn){ 
+    console.error('[go] unknown screen:', name); 
+    return; 
+  }
 
   let el;
-  try { el = fn(); }
-  catch (err) {
+  try { 
+    el = fn(); // Рендерим новый экран в памяти
+  } catch (err) {
     console.error('[render:' + name + ']', err);
     const fallback = document.createElement('div');
     fallback.className = 'screen active';
-    fallback.innerHTML = `<div class="card" style="text-align:center;padding:40px 20px;margin-top:40px">
-      <div style="font-size:44px;margin-bottom:12px">⚠️</div>
-      <div class="h2" style="margin-bottom:8px">Экран не загрузился</div>
-      <p class="muted" style="margin-bottom:16px">${esc(String(err.message || err))}</p>
-      <button class="btn btn-primary btn-full" onclick="location.reload()">Перезагрузить</button>
-    </div>`;
+    fallback.innerHTML = `
+      <div class="card" style="text-align:center;padding:40px 20px;margin-top:40px">
+        <div style="font-size:44px;margin-bottom:12px">⚠️</div>
+        <div class="h2" style="margin-bottom:8px">Экран не загрузился</div>
+        <p class="muted" style="margin-bottom:16px">${esc(String(err.message || err))}</p>
+        <button class="btn btn-primary btn-full" onclick="location.reload()">Перезагрузить</button>
+      </div>`;
+    host.innerHTML = '';
     host.appendChild(fallback);
     currentScreen = name;
-    $$('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.nav === name));
     return;
   }
+
+  // 2. Атомарная замена DOM (без мерцания)
+  host.innerHTML = ''; 
   el.classList.add('active');
+  // ANTI-FLICKER: при перерисовке того же экрана не запускаем entry-анимации
+  if (isSameScreen) el.classList.add('no-enter');
   host.appendChild(el);
+  
   currentScreen = name;
   $$('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.nav === name));
-  window.scrollTo(0, 0);
+
+  // 3. Восстанавливаем состояние
+  if (isSameScreen) {
+    // Открываем обратно карточки еды
+    openMeals.forEach(mealId => {
+      const card = host.querySelector(`.meal-card[data-meal="${mealId}"]`);
+      if (card) card.classList.add('open');
+    });
+    
+    // Мгновенно возвращаем скролл (без дерганий)
+    window.scrollTo({ top: currentScroll, behavior: 'instant' });
+  } else {
+    // При смене экрана — скролл в начало
+    window.scrollTo(0, 0);
+  }
+
+  // Запускаем хуки (питомцы, сады и т.д.)
   App.hooks.afterGo.forEach(h => { try{ h(name); }catch(e){ console.warn('[afterGo]', e); } });
 }
 $$('.nav-btn').forEach(b => b.onclick = () => { SFX.tap(); buzz(8); go(b.dataset.nav); });

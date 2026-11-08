@@ -1,4 +1,4 @@
-/* ═══ NAVLIFE · NUTRITION · v4.3 · редактирование блюд ═══ */
+/* ═══ NAVLIFE · NUTRITION · v4.5 · Fix data sync ═══ */
 (function(){
 'use strict';
 const N = window.__nav;
@@ -35,48 +35,52 @@ const KCAL_PER_G = { p: 4, f: 9, c: 4 };
 
 let addFoodTarget = null;
 
-/* ═══ Хранилище планов ═══ */
-function ensurePlansStore(){
-  if (!N.S.nutrition.plans) N.S.nutrition.plans = {};
-}
-function getPlan(ds){
-  ensurePlansStore();
-  const p = N.S.nutrition.plans[ds];
-  if (!p || !Array.isArray(p.slots)) return null;
-  return p;
-}
-function savePlan(ds, plan){
-  ensurePlansStore();
-  N.S.nutrition.plans[ds] = plan;
-  saveState();
-}
-function clearPlan(ds){
-  ensurePlansStore();
-  delete N.S.nutrition.plans[ds];
-  saveState();
-}
+function ensurePlansStore(){ if (!N.S.nutrition.plans) N.S.nutrition.plans = {}; }
+function getPlan(ds){ ensurePlansStore(); const p = N.S.nutrition.plans[ds]; if (!p || !Array.isArray(p.slots)) return null; return p; }
+function savePlan(ds, plan){ ensurePlansStore(); N.S.nutrition.plans[ds] = plan; saveState(); }
+function clearPlan(ds){ ensurePlansStore(); delete N.S.nutrition.plans[ds]; saveState(); }
 
-/* ═══ КБЖУ за день ═══ */
+/* ═══ ЕДИНЫЙ ИСТОЧНИК ПРАВДЫ ДЛЯ КБЖУ ═══ */
 function nutritionToday(date){
   const ds = date || todayKey();
   if (!N.S.nutrition.days[ds]) N.S.nutrition.days[ds] = { meals:{breakfast:[],lunch:[],dinner:[],snack:[]}, water:0, notes:'' };
   const d = N.S.nutrition.days[ds];
   if (!d.meals) d.meals = { breakfast:[], lunch:[], dinner:[], snack:[] };
   ['breakfast','lunch','dinner','snack'].forEach(k => { if (!d.meals[k]) d.meals[k] = []; });
+
   let kcal = 0, prot = 0, fat = 0, carb = 0;
+
+  // 1. Считаем еду
   ['breakfast','lunch','dinner','snack'].forEach(m => {
     (d.meals[m] || []).forEach(item => {
-      const grams = item.grams !== undefined ? item.grams : 100;
+      const grams = item.grams !== undefined ? Number(item.grams) : 100;
       const f = grams / 100;
-      kcal += (item.kcal || 0)*f; prot += (item.p || 0)*f; fat += (item.f || 0)*f; carb += (item.c || 0)*f;
+      kcal += (Number(item.kcal) || 0)*f; 
+      prot += (Number(item.p) || 0)*f; 
+      fat += (Number(item.f) || 0)*f; 
+      carb += (Number(item.c) || 0)*f;
     });
   });
+
+  // 2. Считаем витамины
+  const vitamins = N.S.nutrition.vitamins || [];
+  const vLog = (N.S.nutrition.vitaminLog && N.S.nutrition.vitaminLog[ds]) || [];
+  vLog.forEach(id => {
+    const v = vitamins.find(x => x.id === id);
+    if (v) {
+      kcal += Number(v.kcal) || 0;
+      prot += Number(v.p) || 0;
+      fat += Number(v.f) || 0;
+      carb += Number(v.c) || 0;
+    }
+  });
+
   return {
     kcal: Math.round(kcal),
     protein: Math.round(prot),
     fat: Math.round(fat),
     carbs: Math.round(carb),
-    water: d.water || 0,
+    water: Number(d.water) || 0,
     data: d
   };
 }
@@ -506,10 +510,17 @@ function renderNutrition(){
     const w = e.target.closest('[data-water]');
     if (w){
       const delta = +w.dataset.water;
-      d.water = Math.max(0, (d.water||0) + delta);
+      d.water = Math.max(0, (Number(d.water) || 0) + delta);
       SFX.tap(); buzz(8); saveState();
+      
+      const valEl = root.querySelector('.water-val');
+      if (valEl) valEl.innerHTML = `${d.water}<small>/${g.water} мл</small>`;
+      
+      const fillEl = root.querySelector('.water-fill');
+      if (fillEl) fillEl.style.width = `${Math.min(100, Math.round(d.water / Math.max(1, g.water) * 100))}%`;
+
       if (window.Achievements) window.Achievements.check();
-      go('nutrition'); return;
+      return;
     }
     const q = e.target.closest('[data-quick]');
     if (q){
@@ -679,7 +690,6 @@ function openSlotEditor(ds, slotId){
   const slot = plan.slots.find(s => s.id === slotId);
   if (!slot) return;
 
-  // Рабочая копия компонентов
   const components = JSON.parse(JSON.stringify(slot.components || []));
 
   const layer = openModal(`
@@ -709,7 +719,6 @@ function openSlotEditor(ds, slotId){
         sumEl.querySelector('.slotKcal').textContent = `${tot.kcal} ккал`;
         sumEl.querySelector('.slotMacros').textContent = `Б ${tot.p} · Ж ${tot.f} · У ${tot.c}`;
       }
-      // Обновить kcal в каждой карточке компонента
       host.querySelectorAll('[data-comp-kcal]').forEach(el => {
         const i = +el.dataset.compKcal;
         const c = components[i];
@@ -757,7 +766,6 @@ function openSlotEditor(ds, slotId){
         </div>
       `;
 
-      // Изменение граммовки
       host.querySelectorAll('[data-g]').forEach(inp => {
         inp.oninput = () => {
           const i = +inp.dataset.g;
@@ -776,7 +784,6 @@ function openSlotEditor(ds, slotId){
         };
       });
 
-      // Уменьшить / увеличить
       host.querySelectorAll('[data-dg]').forEach(b => b.onclick = () => {
         const i = +b.dataset.dg;
         const step = components[i].grams > 50 ? 10 : 5;
@@ -796,7 +803,6 @@ function openSlotEditor(ds, slotId){
         updateTotals();
       });
 
-      // Удалить
       host.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => {
         const i = +b.dataset.rm;
         components.splice(i, 1);
@@ -804,7 +810,6 @@ function openSlotEditor(ds, slotId){
         draw();
       });
 
-      // Добавить
       const addBtn = host.querySelector('#addComp');
       if (addBtn) addBtn.onclick = () => {
         openAddComponentModal((newComp) => {
@@ -814,16 +819,13 @@ function openSlotEditor(ds, slotId){
         });
       };
 
-      // Отмена / Сохранить
       host.querySelector('#cancelSlot').onclick = () => closeModal(layer);
       host.querySelector('#saveSlot').onclick = () => {
         if (!components.length){
           toast('Добавь хотя бы один компонент'); return;
         }
-        // Обновляем слот
         slot.components = components.map(c => ({ ...c }));
         recalcSlot(slot);
-        // Синхронизируем с дневником, если слот подтверждён
         syncSlotToDay(ds, slot);
         savePlan(ds, plan);
         closeModal(layer);
@@ -1022,7 +1024,6 @@ function openPlanModal(ds){
         const oldPlan = getPlan(ds);
         const confirmedOld = oldPlan ? oldPlan.slots.filter(s => s.confirmed) : [];
 
-        // Синхронизировать с дневником: удалить старые неподтверждённые (если были)
         const day = N.S.nutrition.days[ds];
         const oldPending = oldPlan ? oldPlan.slots.filter(s => !s.confirmed) : [];
         oldPending.forEach(s => {

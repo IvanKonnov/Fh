@@ -1,10 +1,20 @@
-/* ═══ NAVLIFE · SLEEP TRACKER · v2.2 · + Sleep Cycles (fixed crash) ═══ */
+/* ═══ NAVLIFE · SLEEP TRACKER · v3.1 · Premium + Cycles + Tips ═══ */
 (function(){
 'use strict';
 const N = window.__nav;
 if (!N){ console.error('[SLEEP] __nav not found'); return; }
 const { go, saveState, esc, todayKey, fmtDate, openModal, closeModal, toast, SFX, buzz } = N;
 const qs = (s, r=document) => r.querySelector(s);
+
+const TIPS = [
+  'Старайтесь ложиться и вставать в одно и то же время, даже в выходные.',
+  'Избегайте экранов за час до сна — синий свет сбивает выработку мелатонина.',
+  'Оптимальная температура в спальне — 18–20°C.',
+  'Не пейте кофе и крепкий чай после 16:00.',
+  'Проветривайте спальню перед сном.',
+  'Тяжёлая еда на ночь мешает глубокому сну. Ужинайте за 2–3 часа до сна.',
+  'Попробуйте дыхательную практику 4-7-8 перед сном, чтобы быстрее заснуть.'
+];
 
 function get(ds){ return N.S.sleep[ds || todayKey()] || null; }
 function set(ds, data){ N.S.sleep = N.S.sleep || {}; N.S.sleep[ds] = { ...data, ts: Date.now() }; saveState(); }
@@ -29,12 +39,11 @@ function fmtTime(m){
   return String(h).padStart(2,'0') + ':' + String(min).padStart(2,'0');
 }
 
-/* Проверка валидности времени HH:MM */
 function isValidTime(s){
   return typeof s === 'string' && /^\d{2}:\d{2}$/.test(s);
 }
 
-/* ═══ Основная модалка сна ═══ */
+/* ═══ Модалка записи сна ═══ */
 function openModal_(){
   const ds = todayKey();
   const cur = get(ds) || { bed:'23:00', wake:'07:00', quality:3 };
@@ -42,15 +51,18 @@ function openModal_(){
 
   openModal(`
     <div class="modal-handle"></div>
-    <div class="between" style="margin-bottom:16px">
-      <div class="h2">😴 Сон</div>
-      <button class="btn btn-line btn-sm" id="calcCycles" type="button">🧮 Циклы сна</button>
-    </div>
+    <div class="h2" style="margin-bottom:16px">😴 Сон</div>
     <p class="muted" style="margin-bottom:16px">Запись за ${new Date().toLocaleDateString('ru-RU',{day:'numeric',month:'long'})}</p>
 
     <div class="field-row">
-      <div class="field"><label>Ложился в</label><input id="sBed" type="time" value="${bed}"></div>
-      <div class="field"><label>Встал в</label><input id="sWake" type="time" value="${wake}"></div>
+      <div class="field">
+        <label>Ложился в</label>
+        <input id="sBed" type="time" value="${bed}" style="text-align:center;font-weight:600;font-size:16px">
+      </div>
+      <div class="field">
+        <label>Встал в</label>
+        <input id="sWake" type="time" value="${wake}" style="text-align:center;font-weight:600;font-size:16px">
+      </div>
     </div>
 
     <div id="hoursBadge" style="text-align:center;padding:14px;background:var(--paper);border-radius:12px;margin-bottom:16px;font-family:'Fraunces',serif;font-size:22px;font-weight:600;">— ч</div>
@@ -67,8 +79,12 @@ function openModal_(){
         ">${n}${n===1?' 😞':n===2?' 😐':n===3?' 🙂':n===4?' 😄':' 🤩'}</button>`).join('')}
       </div>
     </div>
+    
+    <div style="padding:14px 16px;background:var(--moss-soft);border-radius:12px;margin-bottom:20px;font-size:13px;line-height:1.55;color:var(--moss)">
+      <b>💡 Совет:</b> ${TIPS[Math.floor(Math.random() * TIPS.length)]}
+    </div>
 
-    <div style="display:flex;gap:10px;margin-top:8px">
+    <div style="display:flex;gap:10px">
       <button class="btn btn-ghost btn-full" id="sCancel" type="button">Отмена</button>
       <button class="btn btn-primary btn-full" id="sSave" type="button">Сохранить</button>
     </div>
@@ -101,145 +117,162 @@ function openModal_(){
       set(ds, { bed: bedV, wake: wakeV, quality, hours });
       SFX.ok();
       if (window.Achievements) window.Achievements.check();
-      closeModal(m); go(N.currentScreen || 'today');
+      closeModal(m); 
+      N.go(N.currentScreen || 'today');
       toast('Сон записан');
-    };
-
-    qs('#calcCycles',m).onclick = () => {
-      const wakeVal = qs('#sWake',m).value || '07:00';
-      closeModal(m);
-      setTimeout(() => openCycleCalculator(wakeVal), 150);
     };
   });
 }
 
-/* ═══ Калькулятор циклов сна ═══ */
-function openCycleCalculator(initialWake) {
-  let wakeTime = isValidTime(initialWake) ? initialWake : '07:00';
-
-  function computeOptions(wakeStr) {
-    if (!isValidTime(wakeStr)) return [];
-    const [wh, wm] = wakeStr.split(':').map(Number);
-    if (isNaN(wh) || isNaN(wm)) return [];
-    const wakeMin = wh * 60 + wm;
-    const opts = [];
-    for (let cycles = 6; cycles >= 3; cycles--) {
-      const totalSleepMin = cycles * 90;
-      let bedMin = wakeMin - totalSleepMin - 15;
-      if (bedMin < 0) bedMin += 24 * 60;
-      opts.push({
-        cycles,
-        totalMins: totalSleepMin,
-        hoursText: `${Math.floor(totalSleepMin/60)} ч${totalSleepMin%60 ? ' '+(totalSleepMin%60)+' мин' : ''}`,
-        bedTime: fmtTime(bedMin),
-        bedMin
-      });
-    }
-    return opts;
-  }
-
-  function renderOptions() {
-    const opts = computeOptions(wakeTime);
-    if (!opts.length){
-      return `<div class="muted" style="text-align:center;padding:16px;font-size:13px">Выбери корректное время подъёма</div>`;
-    }
-    const now = new Date();
-    const nowMin = now.getHours() * 60 + now.getMinutes();
-
-    return opts.map((o) => {
-      const isBest = o.cycles === 5 || o.cycles === 6;
-      const diff = (o.bedMin - nowMin + 24*60) % (24*60);
-      let waitText = '';
-      if (diff > 0 && diff <= 60) waitText = `через ${diff} мин`;
-      else if (diff > 60) waitText = `через ${Math.floor(diff/60)} ч ${diff%60} мин`;
-
-      return `
-        <div style="padding:14px 16px;border-radius:12px;border:1.5px solid ${isBest ? 'var(--moss)' : 'var(--line)'};background:${isBest ? 'linear-gradient(135deg,var(--moss-soft),var(--surface-raised))' : 'var(--paper)'};display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <div style="font-size:13px;font-weight:700;color:${isBest ? 'var(--moss)' : 'var(--ink)'};margin-bottom:4px">${o.cycles} циклов · ${o.hoursText}</div>
-            <div style="font-size:11.5px;color:var(--ink-soft)">
-              ${isBest ? '✨ Оптимально' : 'Можно'}${waitText ? ` · ${waitText}` : ''}
-            </div>
-          </div>
-          <div style="text-align:right">
-            <div style="font-family:'Fraunces',serif;font-size:26px;font-weight:600;color:${isBest ? 'var(--moss)' : 'var(--ink)'};line-height:1">${o.bedTime}</div>
-            <div style="font-size:10.5px;color:var(--ink-mute);margin-top:2px">лечь спать</div>
-          </div>
-        </div>
-      `;
-    }).join('');
-  }
+/* ═══ Двусторонний калькулятор циклов ═══ */
+function openCycleCalculator(initialMode = 'wake', initialTime = '07:00') {
+  let mode = initialMode;
+  let timeVal = isValidTime(initialTime) ? initialTime : '07:00';
 
   const layer = openModal(`
     <div class="modal-handle"></div>
     <div class="h2" style="margin-bottom:6px">🧮 Циклы сна</div>
-    <p class="muted" style="margin-bottom:16px">Рассчитай идеальное время отхода ко сну</p>
+    <p class="muted" style="margin-bottom:16px">Узнай идеальное время для сна или подъёма</p>
 
-    <div style="padding:12px 14px;background:var(--moss-soft);border-radius:12px;margin-bottom:16px">
-      <div class="h3" style="font-size:14px;margin-bottom:6px;color:var(--moss)">Что такое цикл сна?</div>
-      <p style="font-size:12.5px;color:var(--moss);line-height:1.55;margin:0">
-        Сон состоит из циклов по <b>~90 минут</b>. Каждый цикл — это погружение в глубокий сон и подъём к поверхностному.
-        Если проснуться в конце цикла, ты почувствуешь себя бодрым. Если в середине — будет чувство разбитости.
-        Приложение рассчитывает время с учётом того, что на засыпание уходит <b>15 минут</b>.
-      </p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:16px" id="ccTabs">
+      <button type="button" data-mode="wake" style="padding:12px 8px;border-radius:12px;font-size:13px;font-weight:600;background:${mode==='wake'?'var(--moss)':'var(--paper)'};color:${mode==='wake'?'#fff':'var(--ink)'};border:1.5px solid ${mode==='wake'?'var(--moss)':'var(--line)'};">Хочу встать в</button>
+      <button type="button" data-mode="bed" style="padding:12px 8px;border-radius:12px;font-size:13px;font-weight:600;background:${mode==='bed'?'var(--moss)':'var(--paper)'};color:${mode==='bed'?'#fff':'var(--ink)'};border:1.5px solid ${mode==='bed'?'var(--moss)':'var(--line)'};">Хочу лечь в</button>
     </div>
 
     <div class="field">
-      <label>Во сколько нужно встать?</label>
-      <input id="calcWake" type="time" value="${wakeTime}" style="width:100%;padding:12px;font-size:20px;text-align:center;font-weight:600;font-family:'Fraunces',serif;border:1.5px solid var(--moss);border-radius:12px;background:var(--surface);color:var(--ink)">
+      <label id="ccLabel">${mode === 'wake' ? 'Во сколько нужно встать?' : 'Во сколько планируешь лечь?'}</label>
+      <input id="ccTime" type="time" value="${timeVal}" style="width:100%;padding:14px;font-size:22px;text-align:center;font-weight:600;font-family:'Fraunces',serif;border:1.5px solid var(--moss);border-radius:12px;background:var(--surface);color:var(--ink)">
     </div>
 
-    <div class="tiny" style="margin-bottom:10px;letter-spacing:.08em">ИДЕАЛЬНОЕ ВРЕМЯ ДЛЯ СНА</div>
-    <div id="ccOptions" style="display:grid;gap:8px;margin-bottom:16px">${renderOptions()}</div>
+    <div id="ccResult" style="margin-bottom:16px"></div>
+
+    <div style="padding:14px 16px;background:var(--paper);border-radius:12px;font-size:12px;line-height:1.55;color:var(--ink-soft);margin-bottom:16px">
+      <b>Как это работает:</b> Сон состоит из циклов по 90 минут. Легче всего просыпаться в конце цикла. Мы заложили 15 минут на засыпание.
+    </div>
 
     <button class="btn btn-primary btn-full btn-lg" id="ccDone" type="button">Понятно</button>
   `, m => {
-    const input = m.querySelector('#calcWake');
-    const optionsEl = m.querySelector('#ccOptions');
+    const input = m.querySelector('#ccTime');
+    const label = m.querySelector('#ccLabel');
+    const tabs = m.querySelectorAll('[data-mode]');
+    const resEl = m.querySelector('#ccResult');
 
-    /* Обновляем ТОЛЬКО список, поле ввода не трогаем — фикс краша */
-    const update = () => {
+    function compute() {
       const v = input.value;
       if (!isValidTime(v)) return;
-      wakeTime = v;
-      optionsEl.innerHTML = renderOptions();
-    };
-    input.addEventListener('input', update);
-    input.addEventListener('change', update);
+      timeVal = v;
+      const [h, mi] = v.split(':').map(Number);
+      const baseMin = h * 60 + mi;
+      const opts = [];
+      
+      if (mode === 'wake') {
+        for (let cycles = 6; cycles >= 3; cycles--) {
+          let bedMin = baseMin - 15 - cycles * 90;
+          while (bedMin < 0) bedMin += 24 * 60;
+          opts.push({
+            cycles,
+            time: fmtTime(bedMin),
+            label: `${cycles} циклов · ${Math.floor(cycles*90/60)}ч ${cycles*90%60 ? cycles*90%60+'м' : ''}`
+          });
+        }
+      } else {
+        for (let cycles = 6; cycles >= 3; cycles--) {
+          let wakeMin = baseMin + 15 + cycles * 90;
+          while (wakeMin >= 24 * 60) wakeMin -= 24 * 60;
+          opts.push({
+            cycles,
+            time: fmtTime(wakeMin),
+            label: `${cycles} циклов · ${Math.floor(cycles*90/60)}ч ${cycles*90%60 ? cycles*90%60+'м' : ''}`
+          });
+        }
+      }
+
+      resEl.innerHTML = opts.map(o => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:var(--surface-raised);border:1px solid var(--line);border-radius:12px;margin-bottom:8px;box-shadow:var(--sh-1)">
+          <div>
+            <div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:2px">${o.label}</div>
+            <div style="font-size:11px;color:var(--ink-soft)">${mode === 'wake' ? 'оптимальное время отхода' : 'оптимальное время подъёма'}</div>
+          </div>
+          <div style="font-family:'Fraunces',serif;font-size:24px;font-weight:600;color:var(--moss)">${o.time}</div>
+        </div>
+      `).join('');
+    }
+
+    tabs.forEach(b => b.onclick = () => {
+      mode = b.dataset.mode;
+      tabs.forEach(x => {
+        const on = x.dataset.mode === mode;
+        x.style.background = on ? 'var(--moss)' : 'var(--paper)';
+        x.style.color = on ? '#fff' : 'var(--ink)';
+        x.style.borderColor = on ? 'var(--moss)' : 'var(--line)';
+      });
+      label.textContent = mode === 'wake' ? 'Во сколько нужно встать?' : 'Во сколько планируешь лечь?';
+      SFX.tap();
+      compute();
+    });
+
+    input.addEventListener('input', compute);
+    compute();
 
     m.querySelector('#ccDone').onclick = () => closeModal(layer);
   });
 }
 
+/* ═══ Карточка на главной ═══ */
 function todayCard(){
   const ds = todayKey();
   const s = get(ds);
+  const randomTip = TIPS[Math.floor(Math.random() * TIPS.length)];
+
   if (!s){
-    return `<button class="card tappable" data-sleep-open type="button" style="width:100%;text-align:left;margin-top:14px;background:linear-gradient(135deg,#3F5A7A 0%,#2E4158 100%);border-color:transparent;color:#F4F2EA">
-      <div class="between">
-        <div>
-          <div class="tiny" style="color:#C7CEC5">СОН</div>
-          <div style="font-size:15px;font-weight:600;margin-top:6px;color:#F4F2EA">Записать сон</div>
-          <div style="font-size:12.5px;margin-top:2px;color:#C7CEC5;opacity:.9">Сколько спал, качество</div>
+    return `<div class="card" style="margin-top:14px;background:linear-gradient(135deg,#3F5A7A 0%,#2E4158 100%);border:none;color:#F4F2EA;padding:20px">
+      <div class="between" style="margin-bottom:14px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:40px;height:40px;border-radius:12px;background:rgba(255,255,255,.1);display:grid;place-items:center;font-size:22px">😴</div>
+          <div>
+            <div style="font-size:16px;font-weight:600;font-family:'Fraunces',serif">Сон</div>
+            <div style="font-size:12px;color:#C7CEC5;margin-top:2px">Записей пока нет</div>
+          </div>
         </div>
-        <div style="font-size:30px">😴</div>
+        <div style="font-size:32px;opacity:.3">🌙</div>
       </div>
-    </button>`;
+      <div style="padding:12px;background:rgba(255,255,255,.08);border-radius:12px;margin-bottom:16px;font-size:12.5px;line-height:1.5;color:#C7CEC5">
+        💡 <b>Совет:</b> ${randomTip}
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary btn-full" data-sleep-open type="button" style="background:#F3E3C8;color:#3F5A7A;font-weight:600;box-shadow:none">Записать сон</button>
+        <button class="btn btn-ghost btn-full" data-sleep-calc type="button" style="background:rgba(255,255,255,.1);color:#fff;border:none">Циклы</button>
+      </div>
+    </div>`;
   }
+  
   const q = s.quality || 0;
-  return `<div class="sleep-card">
-    <div class="sleep-head">
-      <div class="sleep-title">😴 Сон</div>
-      <div class="sleep-big">${s.hours}ч</div>
+  return `<div class="sleep-card" style="padding:20px; border-radius:var(--r-lg)">
+    <div class="sleep-head" style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:40px;height:40px;border-radius:12px;background:rgba(255,255,255,.1);display:grid;place-items:center;font-size:22px">😴</div>
+        <div>
+          <div style="font-size:16px;font-weight:600;font-family:'Fraunces',serif;color:#fff">Сон</div>
+          <div style="font-size:12px;color:#C7CEC5;margin-top:2px">${s.bed} — ${s.wake}</div>
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div class="sleep-big" style="font-size:28px;color:#F3E3C8;line-height:1">${s.hours}<span style="font-size:14px">ч</span></div>
+        <div style="font-size:11px;color:#C7CEC5;margin-top:4px;letter-spacing:.05em">ДЛИТЕЛЬНОСТЬ</div>
+      </div>
     </div>
-    <div class="sleep-times">
-      <div>🌙 <b>${s.bed}</b></div>
-      <div>☀️ <b>${s.wake}</b></div>
+    
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div class="sleep-quality" style="margin-bottom:0">
+        ${[1,2,3,4,5].map(n => `<i class="${n <= q ? 'on' : ''}"></i>`).join('')}
+      </div>
+      <div style="font-size:12px;color:#C7CEC5">${q === 1 ? 'Плохо' : q === 2 ? 'Средне' : q === 3 ? 'Нормально' : q === 4 ? 'Хорошо' : 'Отлично'}</div>
     </div>
-    <div class="sleep-quality">
-      ${[1,2,3,4,5].map(n => `<i class="${n <= q ? 'on' : ''}"></i>`).join('')}
+    
+    <div style="display:flex;gap:8px">
+      <button class="sleep-btn" data-sleep-open type="button" style="background:rgba(255,255,255,.15);flex:1">✎ Изменить</button>
+      <button class="sleep-btn" data-sleep-calc type="button" style="background:rgba(255,255,255,.08);flex:1">🧮 Циклы</button>
     </div>
-    <button class="sleep-btn" data-sleep-open type="button">Изменить</button>
   </div>`;
 }
 
@@ -290,6 +323,6 @@ function weekChart(){
     </div>`;
 }
 
-window.Sleep = { get, set, open: openModal_, openCalc: openCycleCalculator, todayCard, correlationInsight, weekChart };
-console.log('[Sleep] v2.2 loaded');
+window.Sleep = { get, set, open: openModal_, openCalc: openCycleCalculator, todayCard, correlationInsight, weekChart, TIPS };
+console.log('[Sleep] v3.1 (Premium) loaded');
 })();

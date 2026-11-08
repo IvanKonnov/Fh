@@ -1,4 +1,4 @@
-/* ═══ NAVLIFE · AUTO-SCHEDULE · v2.0 · с полным редактором ═══ */
+/* ═══ NAVLIFE · AUTO-SCHEDULE · v2.1 · sync injection ═══ */
 (function(){
 'use strict';
 const N = window.__nav;
@@ -16,7 +16,6 @@ function toMin(t){
   return (h||0)*60 + (m||0);
 }
 
-/* ═══ Свободные окна на день ═══ */
 function computeFreeSlots(ds){
   const items = N.S.navlife.schedule
     .filter(i => i.date === ds)
@@ -36,7 +35,6 @@ function computeFreeSlots(ds){
   return slots;
 }
 
-/* ═══ Привычки для добавления ═══ */
 function habitsToSchedule(){
   const ds = N.todayKey();
   const links = N.S.navlife.habitLinks || {};
@@ -49,9 +47,7 @@ function habitsToSchedule(){
   });
 }
 
-/* ═══ Открыть редактор ═══ */
 function openEditor(ds, items){
-  /* items = [{ key, type:'habit'|'manual', title, emoji, time, duration, include, habitId? }] */
   const freeSlots = computeFreeSlots(ds);
   const usedIds = items.filter(i => i.type === 'habit').map(i => i.habitId);
 
@@ -174,7 +170,6 @@ function openEditor(ds, items){
           const e2 = toMin(ev.endTime);
           if (s1 < e2 && e1 > s2){ conflict = ev.title; break; }
         }
-        /* Конфликт с другими элементами из плана */
         for (let j = 0; j < items.length; j++){
           if (j === i) continue;
           const o = items[j];
@@ -202,10 +197,8 @@ function openEditor(ds, items){
       applyBtn.style.pointerEvents = n === 0 ? 'none' : 'auto';
     }
 
-    /* Добавить новый */
     const addBtn = m.querySelector('#asAdd');
     addBtn.onclick = () => {
-      /* Открываем субмодалку выбора: привычка или вручную */
       openAddPicker(ds, usedIds, (newItem) => {
         items.push(newItem);
         if (newItem.type === 'habit') usedIds.push(newItem.habitId);
@@ -246,7 +239,6 @@ function openEditor(ds, items){
   });
 }
 
-/* ═══ Субмодалка выбора ═══ */
 function openAddPicker(ds, usedHabitIds, onPick){
   const availableHabits = habitsToSchedule().filter(h => !usedHabitIds.includes(h.id));
 
@@ -294,7 +286,6 @@ function openAddPicker(ds, usedHabitIds, onPick){
         const id = btn.dataset.pickHabit;
         const h = (N.S.habits || []).find(x => x.id === id);
         if (!h) return;
-        /* Ищем свободное время — первый подходящий слот */
         const freeSlots = computeFreeSlots(ds);
         const slot = freeSlots[0];
         const time = slot ? fmtClock(slot.start) : '12:00';
@@ -318,7 +309,6 @@ function openAddPicker(ds, usedHabitIds, onPick){
   });
 }
 
-/* ═══ Ручное добавление ═══ */
 function openManualPrompt(ds, onPick){
   const freeSlots = computeFreeSlots(ds);
   const time = freeSlots[0] ? fmtClock(freeSlots[0].start) : '12:00';
@@ -361,7 +351,6 @@ function openManualPrompt(ds, onPick){
   });
 }
 
-/* ═══ Запуск ═══ */
 function startAutoSchedule(){
   const ds = N.todayKey();
   const pending = habitsToSchedule();
@@ -374,7 +363,6 @@ function startAutoSchedule(){
   const dayItems = N.S.navlife.schedule.filter(i => i.date === ds);
   const links = N.S.navlife.habitLinks || {};
 
-  /* Привычки без события сегодня */
   const missing = pending.filter(h => {
     const baseId = links[h.id];
     return !dayItems.some(s => s.fromBase && s.baseRef === baseId);
@@ -391,7 +379,6 @@ function startAutoSchedule(){
     return;
   }
 
-  /* Формируем предложение */
   const proposed = [];
   let slotIdx = 0;
   let slotCursor = freeSlots[0].start;
@@ -424,33 +411,32 @@ function startAutoSchedule(){
   openEditor(ds, proposed);
 }
 
-/* ═══ Кнопка в Делах ═══ */
+/* ═══ Кнопка в Делах — СИНХРОННО (без setTimeout → нет сжатия) ═══ */
 window.App.hooks.afterGo.push(name => {
   if (name !== 'schedule') return;
-  setTimeout(() => {
-    const host = qs('#screens');
-    if (!host) return;
-    if (host.querySelector('[data-auto-sched]')) return;
-    const tplBtn = host.querySelector('[data-tpl-btn]');
-    const switcher = host.querySelector('[data-view-switch]');
-    const anchor = tplBtn || switcher;
-    if (!anchor) return;
 
-    const btn = document.createElement('button');
-    btn.setAttribute('data-auto-sched', '');
-    btn.type = 'button';
-    btn.className = 'btn btn-primary btn-sm';
-    btn.style.cssText = 'width:100%;margin-bottom:14px';
-    btn.innerHTML = '✨ Собрать день';
-    btn.onclick = () => {
-      N.SFX.tap();
-      if (window.Haptics) Haptics.play('ok');
-      startAutoSchedule();
-    };
-    anchor.parentNode.insertBefore(btn, anchor.nextSibling);
-  }, 80);
+  const host = qs('#screens');
+  if (!host) return;
+  if (host.querySelector('[data-auto-sched]')) return;
+  const tplBtn = host.querySelector('[data-tpl-btn]');
+  const switcher = host.querySelector('[data-view-switch]');
+  const anchor = tplBtn || switcher;
+  if (!anchor) return;
+
+  const btn = document.createElement('button');
+  btn.setAttribute('data-auto-sched', '');
+  btn.type = 'button';
+  btn.className = 'btn btn-primary btn-sm';
+  btn.style.cssText = 'width:100%;margin-bottom:14px';
+  btn.innerHTML = '✨ Собрать день';
+  btn.onclick = () => {
+    N.SFX.tap();
+    if (window.Haptics) Haptics.play('ok');
+    startAutoSchedule();
+  };
+  anchor.parentNode.insertBefore(btn, anchor.nextSibling);
 });
 
 window.AutoSchedule = { run: startAutoSchedule, openEditor };
-console.log('[Auto-Schedule] v2.0 loaded');
+console.log('[Auto-Schedule] v2.1 (sync) loaded');
 })();

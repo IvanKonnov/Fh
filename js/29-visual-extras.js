@@ -1,7 +1,8 @@
-/* ═══ NAVLIFE · VISUAL EXTRAS · v7.0 · Realistic Garden ═══
+/* ═══ NAVLIFE · VISUAL EXTRAS · v7.1 (sync garden) ═══
    • Детализированные SVG-деревья (изогнутые стволы, слои листвы)
    • Починена вёрстка пустого состояния и модалки посадки
    • Анимации: прорисовка ветвей, раскрытие листвы
+   • FIX: garden вставляется синхронно (убрали setTimeout 200ms → нет сжатия страницы)
 */
 (function(){
 'use strict';
@@ -18,7 +19,6 @@ function ensureStyles(){
   const s = document.createElement('style');
   s.id = STYLE_ID;
   s.textContent = `
-/* --- Контейнер сада --- */
 .garden-card-v7 {
   margin: 20px 0;
   padding: 0;
@@ -33,8 +33,6 @@ html[data-theme="dark"] .garden-card-v7 {
   background: rgba(15,15,15,.8);
   box-shadow: 0 12px 40px -12px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.05);
 }
-
-/* Пустое состояние */
 .garden-empty {
   padding: 40px 20px;
   text-align: center;
@@ -51,8 +49,6 @@ html[data-theme="dark"] .garden-card-v7 {
   animation: emptyFloat 3s ease-in-out infinite;
 }
 @keyframes emptyFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
-
-/* --- Сцена --- */
 .garden-scene-v7 {
   position: relative;
   width: 100%;
@@ -66,7 +62,6 @@ html[data-theme="dark"] .garden-card-v7 {
 html[data-theme="dark"] .garden-scene-v7 {
   background: linear-gradient(180deg, #141A16 0%, #0A0F0C 100%);
 }
-
 .garden-sun {
   position: absolute; top: 20px; right: 30px;
   width: 50px; height: 50px; border-radius: 50%;
@@ -75,7 +70,6 @@ html[data-theme="dark"] .garden-scene-v7 {
   animation: sunPulse 8s ease-in-out infinite alternate;
 }
 @keyframes sunPulse { 0% { transform: scale(1); opacity: 0.9; } 100% { transform: scale(1.1); opacity: 1; } }
-
 .garden-cloud {
   position: absolute; background: rgba(255,255,255,0.6);
   border-radius: 40px; filter: blur(6px);
@@ -83,7 +77,6 @@ html[data-theme="dark"] .garden-scene-v7 {
 .garden-cloud.c1 { width: 80px; height: 24px; top: 40px; left: -100px; animation: cloudMove 40s linear infinite; }
 .garden-cloud.c2 { width: 100px; height: 30px; top: 80px; left: -100px; animation: cloudMove 55s linear infinite 10s; opacity: 0.4; }
 @keyframes cloudMove { 100% { transform: translateX(800px); } }
-
 .garden-soil {
   position: absolute; bottom: 0; left: -5%; right: -5%;
   height: 60px;
@@ -95,8 +88,6 @@ html[data-theme="dark"] .garden-scene-v7 {
 html[data-theme="dark"] .garden-soil {
   background: linear-gradient(180deg, #1A241D 0%, #0D120F 100%);
 }
-
-/* --- ДЕРЕВО --- */
 .tree-container {
   position: absolute;
   bottom: 40px;
@@ -116,20 +107,15 @@ html[data-theme="dark"] .garden-soil {
 .tree-willow .tree-container { animation-duration: 5s; transform-origin: top center; }
 .tree-pine .tree-container { animation-name: treeBreathe; animation-duration: 7s; }
 @keyframes treeBreathe { 0%, 100% { transform: translateX(-50%) scale(1); } 50% { transform: translateX(-50%) scale(1.03); } }
-
-/* Анимации SVG */
 .svg-trunk { stroke-dasharray: 200; stroke-dashoffset: 200; transition: stroke-dashoffset 1.5s ease; }
 .svg-branch { stroke-dasharray: 100; stroke-dashoffset: 100; transition: stroke-dashoffset 1s ease 0.3s; }
 .svg-leaf { transform: scale(0); transform-origin: center; opacity: 0; transition: transform 1s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.8s ease; }
 .svg-leaf.d1 { transition-delay: 0.4s; }
 .svg-leaf.d2 { transition-delay: 0.6s; }
 .svg-leaf.d3 { transition-delay: 0.8s; }
-
 .tree-grown .svg-trunk { stroke-dashoffset: 0; }
 .tree-grown .svg-branch { stroke-dashoffset: 0; }
 .tree-grown .svg-leaf { transform: scale(1); opacity: 1; }
-
-/* --- UI панель --- */
 .garden-ui-v7 {
   padding: 16px 20px;
   background: var(--surface-raised);
@@ -144,8 +130,6 @@ html[data-theme="dark"] .garden-soil {
   height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--moss), var(--amber));
   transition: width 0.8s cubic-bezier(0.22, 1, 0.36, 1);
 }
-
-/* --- Модалка посадки --- */
 .plant-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -194,17 +178,11 @@ html[data-theme="dark"] .garden-soil {
 }
 ensureStyles();
 
-/* ═══════════════════════════════════════════════════════════════════
-   ГЕНЕРАТОР КРАСИВЫХ SVG-ДЕРЕВЬЕВ
-   ═══════════════════════════════════════════════════════════════════ */
+/* ═══ ГЕНЕРАТОР SVG-ДЕРЕВЬЕВ ═══ */
 function generateTreeSVG(type, stage) {
-  const isGrown = stage > 0; // Для анимации
+  const isGrown = stage > 0;
   const grownClass = isGrown ? 'tree-grown' : '';
-  
-  // Базовый ствол (изогнутый)
-  let trunk = '';
-  let branches = '';
-  let leaves = '';
+  let trunk = '', branches = '', leaves = '';
 
   if (type === 'oak') {
     trunk = `<path class="svg-trunk" d="M50,100 Q48,70 50,40" stroke="#5C4033" stroke-width="${2 + stage*0.5}" stroke-linecap="round" fill="none" />`;
@@ -259,7 +237,6 @@ function generateTreeSVG(type, stage) {
         <path class="svg-leaf d3" d="M50,30 Q30,0 20,10 Q40,20 50,30 Z" fill="#2E4A3E" />
         <path class="svg-leaf d3" d="M50,30 Q70,0 80,10 Q60,20 50,30 Z" fill="#5E7D6B" />
         <path class="svg-leaf d2" d="M50,30 Q50,-10 40,-15 Q45,10 50,30 Z" fill="#8FAE9B" />
-        <!-- Кокосы -->
         ${stage >= 3 ? `<circle class="svg-leaf d3" cx="48" cy="32" r="3" fill="#5C4033" /><circle class="svg-leaf d3" cx="53" cy="33" r="3" fill="#4A332A" />` : ''}
       `;
     }
@@ -271,7 +248,6 @@ function generateTreeSVG(type, stage) {
       <path class="svg-branch" d="M50,50 Q70,40 75,25" stroke="#5C4033" stroke-width="1.5" stroke-linecap="round" fill="none" />
     `;
     if (stage > 0) {
-      // Упрощенная форма кленового листа
       const mapleLeaf = `M0,-15 L5,-5 L15,-8 L8,2 L12,12 L0,8 L-12,12 L-8,2 L-15,-8 L-5,-5 Z`;
       leaves = `
         <path class="svg-leaf d1" d="${mapleLeaf}" transform="translate(40, 30) scale(${1 + stage*0.2})" fill="#D35F3D" />
@@ -287,7 +263,6 @@ function generateTreeSVG(type, stage) {
     if (stage > 0) {
       leaves = `
         <circle class="svg-leaf d1" cx="50" cy="30" r="${15 + stage*2}" fill="#6B8F71" opacity="0.8"/>
-        <!-- Плакучие ветви -->
         <path class="svg-leaf d2" d="M50,30 Q30,40 25,80 Q35,50 50,30" fill="#4F7563" opacity="0.9"/>
         <path class="svg-leaf d3" d="M50,30 Q70,40 75,80 Q65,50 50,30" fill="#5E7D6B" opacity="0.9"/>
         <path class="svg-leaf d2" d="M50,30 Q15,30 10,70 Q25,40 50,30" fill="#3F6152" opacity="0.8"/>
@@ -307,9 +282,7 @@ function generateTreeSVG(type, stage) {
   `;
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   ЛОГИКА
-   ═══════════════════════════════════════════════════════════════════ */
+/* ═══ ЛОГИКА ═══ */
 const TREES = [
   { key:'oak',    name:'Дуб',       desc:'Крепкий и могучий' },
   { key:'sakura', name:'Сакура',    desc:'Цветёт весной' },
@@ -417,9 +390,7 @@ setTimeout(() => {
   };
 }, 100);
 
-/* ═══════════════════════════════════════════════════════════════════
-   UI
-   ═══════════════════════════════════════════════════════════════════ */
+/* ═══ UI ═══ */
 function renderGardenCard(){
   const g = ensureGarden();
   const current = g.current;
@@ -550,7 +521,6 @@ function bindGardenCard(card){
   }
 }
 
-/* Модалки */
 function openPlantModal(){
   const layer = N.openModal(`
     <div class="modal-handle"></div>
@@ -570,7 +540,6 @@ function openPlantModal(){
     </div>
     <button class="btn btn-ghost btn-full" id="plantCancel" type="button">Отмена</button>
   `, m => {
-    // Анимация для превью
     m.querySelectorAll('.tree-grown').forEach(g => {
        g.classList.remove('tree-grown');
        setTimeout(() => g.classList.add('tree-grown'), 100);
@@ -633,34 +602,35 @@ function openGardenModal(){
   });
 }
 
-/* Вставка на главную */
+/* ═══ Вставка на главную — СИНХРОННО (FIX сжатия страницы) ═══ */
 window.App.hooks.afterGo.push(name => {
   if (name !== 'today') return;
-  setTimeout(() => {
-    const host = qs('#screens');
-    if (!host) return;
-    if (host.querySelector('[data-garden-card]')) return;
 
-    let anchor = host.querySelector('.hero');
-    if (!anchor) {
-      anchor = Array.from(host.querySelectorAll('.card')).find(c => c.textContent.includes('На сегодня всё выполнено'));
-    }
-    if (!anchor) anchor = host.querySelector('.between');
-    if (!anchor) anchor = host.firstElementChild;
+  /* Синхронно — в том же тике, что и host.appendChild(el).
+     Никакого setTimeout → нет промежутка, когда страница сжата. */
+  const host = qs('#screens');
+  if (!host) return;
+  if (host.querySelector('[data-garden-card]')) return;
 
-    if (anchor && anchor.parentNode){
-      const wrapper = document.createElement('div');
-      wrapper.innerHTML = renderGardenCard();
-      const card = wrapper.firstElementChild;
-      
-      if (anchor.nextSibling) {
-        anchor.parentNode.insertBefore(card, anchor.nextSibling);
-      } else {
-        anchor.parentNode.appendChild(card);
-      }
-      bindGardenCard(card);
+  let anchor = host.querySelector('.hero');
+  if (!anchor) {
+    anchor = Array.from(host.querySelectorAll('.card')).find(c => c.textContent.includes('На сегодня всё выполнено'));
+  }
+  if (!anchor) anchor = host.querySelector('.between');
+  if (!anchor) anchor = host.firstElementChild;
+
+  if (anchor && anchor.parentNode){
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = renderGardenCard();
+    const card = wrapper.firstElementChild;
+
+    if (anchor.nextSibling) {
+      anchor.parentNode.insertBefore(card, anchor.nextSibling);
+    } else {
+      anchor.parentNode.appendChild(card);
     }
-  }, 200);
+    bindGardenCard(card);
+  }
 });
 
 window.Garden = {
@@ -669,5 +639,5 @@ window.Garden = {
   getState: ensureGarden
 };
 
-console.log('[Visual Extras] v7.0 (Realistic) loaded');
+console.log('[Visual Extras] v7.1 (sync) loaded');
 })();

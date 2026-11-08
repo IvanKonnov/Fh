@@ -1,4 +1,4 @@
-/* ═══ NAVLIFE · UX ENHANCEMENTS · v2.0 ═══
+/* ═══ NAVLIFE · UX ENHANCEMENTS · v2.2 (profile section fix) ═══
    Размер шрифта · Reduced motion · Swipe-to-close · Count-up · Breathing nav · PWA shortcuts
 */
 (function(){
@@ -15,12 +15,13 @@ function ensureStyles(){
   const s = document.createElement('style');
   s.id = STYLE_ID;
   s.textContent = `
+/* ANTI-FLICKER: bounce только при навигации, не при перерисовке */
 @keyframes barBounce {
   0% { transform: scaleX(var(--p, 0)); }
   40% { transform: scaleX(calc(var(--p, 0) * 1.08)); }
   100% { transform: scaleX(var(--p, 0)); }
 }
-.bar > i.on { animation: barBounce .6s cubic-bezier(.22,1.4,.36,1) 1; }
+.screen:not(.no-enter) .bar > i.on { animation: barBounce .6s cubic-bezier(.22,1.4,.36,1) 1; }
 
 @keyframes navBreathe {
   0%, 100% { transform: translateY(-1px) scale(1); }
@@ -38,20 +39,12 @@ html[data-reduce-motion="true"] *::after {
 
 .modal-handle { cursor: grab; touch-action: none; }
 
-.ux-extras-card .ux-block {
-  padding: 14px 0;
-  border-top: 1px solid var(--line);
-}
-.ux-extras-card .ux-block:first-of-type {
-  border-top: none;
-  padding-top: 0;
-}
-.ux-extras-card .ux-fs-btns {
+.ux-fs-btns {
   display: flex;
   gap: 6px;
   margin-top: 10px;
 }
-.ux-extras-card .ux-fs-btns button {
+.ux-fs-btns button {
   flex: 1;
   padding: 10px 6px;
   border-radius: 10px;
@@ -63,7 +56,7 @@ html[data-reduce-motion="true"] *::after {
   cursor: pointer;
   transition: all .15s;
 }
-.ux-extras-card .ux-fs-btns button.on {
+.ux-fs-btns button.on {
   background: var(--moss);
   color: #fff;
   border-color: var(--moss);
@@ -92,7 +85,7 @@ function applyReduceMotion(){
 
 setTimeout(() => { applyFontScale(); applyReduceMotion(); }, 50);
 
-/* ═══ КАРТОЧКА «Продвинутые настройки» в Профиле ═══ */
+/* ═══ СЕКЦИЯ «ПРОДВИНУТЫЕ НАСТРОЙКИ» В ПРОФИЛЕ ═══ */
 function injectProfileExtras(){
   const host = qs('#screens');
   if (!host) return;
@@ -101,64 +94,61 @@ function injectProfileExtras(){
   const scale = N.S.shared.fontScale || 1;
   const reduce = !!N.S.shared.reduceMotion;
 
-  const card = document.createElement('div');
-  card.className = 'card ux-extras-card';
-  card.setAttribute('data-ux-extras-card', '');
-  card.innerHTML = `
-    <div class="h3" style="margin-bottom:14px;font-family:'Fraunces',serif;font-size:16px">🎛 Продвинутые настройки</div>
-
-    <div class="ux-block" style="border-top:none;padding-top:0">
-      <div class="between" style="margin-bottom:6px">
-        <div>
-          <div class="h3">Размер шрифта</div>
-          <div class="muted" style="font-size:11.5px;margin-top:2px">Увеличить для удобства чтения</div>
+  const section = document.createElement('div');
+  section.setAttribute('data-ux-extras-card', '');
+  section.innerHTML = `
+    <div class="profile-section-title">🎛 Продвинутые настройки</div>
+    <div class="profile-settings">
+      <div class="profile-setting" style="flex-direction:column;align-items:stretch;gap:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div class="profile-setting-label">Размер шрифта</div>
+            <div class="profile-setting-desc">Увеличить для удобства чтения</div>
+          </div>
+          <div class="tiny" id="uxFsVal" style="font-family:'Fraunces',serif;font-size:15px;color:var(--moss);font-weight:600">${Math.round(scale*100)}%</div>
         </div>
-        <div class="tiny" id="uxFsVal" style="font-family:'Fraunces',serif;font-size:15px;color:var(--moss);font-weight:600">${Math.round(scale*100)}%</div>
+        <div class="ux-fs-btns" id="uxFsBtns">
+          ${FONT_SCALES.map(s => `
+            <button type="button" data-fs="${s}" class="${Math.abs(scale-s) < 0.01 ? 'on' : ''}">
+              ${Math.round(s*100)}%
+            </button>
+          `).join('')}
+        </div>
       </div>
-      <div class="ux-fs-btns" id="uxFsBtns">
-        ${FONT_SCALES.map(s => `
-          <button type="button" data-fs="${s}" class="${Math.abs(scale-s) < 0.01 ? 'on' : ''}">
-            ${Math.round(s*100)}%
-          </button>
-        `).join('')}
-      </div>
-    </div>
-
-    <div class="ux-block">
-      <div class="between">
+      <div class="profile-setting">
         <div>
-          <div class="h3">Меньше анимаций</div>
-          <div class="muted" style="font-size:11.5px;margin-top:2px">Убирает все эффекты и переходы</div>
+          <div class="profile-setting-label">Меньше анимаций</div>
+          <div class="profile-setting-desc">Убирает все эффекты и переходы</div>
         </div>
         <div class="switch ${reduce ? 'on' : ''}" id="uxReduceSw"></div>
       </div>
     </div>
   `;
 
-  /* Вставляем в конец — перед блоком «Важно» если он есть, иначе в самый конец */
+  /* Вставляем перед блоком "ВАЖНО" */
   const disclaimer = Array.from(host.querySelectorAll('.card'))
-    .find(c => c.textContent.includes('медицинское устройство'));
+    .find(c => c.textContent.includes('медицинское устройство') || c.textContent.includes('ВАЖНО'));
+  
   if (disclaimer && disclaimer.parentNode){
-    disclaimer.parentNode.insertBefore(card, disclaimer);
+    disclaimer.parentNode.insertBefore(section, disclaimer);
   } else {
-    host.appendChild(card);
+    host.appendChild(section);
   }
 
-  /* Обработчики */
-  card.querySelectorAll('[data-fs]').forEach(b => b.onclick = () => {
+  section.querySelectorAll('[data-fs]').forEach(b => b.onclick = () => {
     const v = parseFloat(b.dataset.fs);
     N.S.shared.fontScale = v;
     N.saveState();
     applyFontScale();
-    card.querySelectorAll('[data-fs]').forEach(x => {
+    section.querySelectorAll('[data-fs]').forEach(x => {
       x.classList.toggle('on', Math.abs(parseFloat(x.dataset.fs) - v) < 0.01);
     });
-    const valEl = card.querySelector('#uxFsVal');
+    const valEl = section.querySelector('#uxFsVal');
     if (valEl) valEl.textContent = Math.round(v*100) + '%';
     N.SFX.tap(); if (window.Haptics) Haptics.play('ok');
   });
 
-  const sw = card.querySelector('#uxReduceSw');
+  const sw = section.querySelector('#uxReduceSw');
   if (sw) sw.onclick = () => {
     N.S.shared.reduceMotion = !N.S.shared.reduceMotion;
     N.saveState();
@@ -170,7 +160,9 @@ function injectProfileExtras(){
 
 window.App.hooks.afterGo.push(name => {
   if (name !== 'profile') return;
-  setTimeout(injectProfileExtras, 120);
+  requestAnimationFrame(() => {
+    try { injectProfileExtras(); } catch(e){}
+  });
 });
 
 /* ═══ COUNT-UP ═══ */
@@ -278,9 +270,12 @@ setTimeout(() => {
   setTimeout(() => handleShortcut(action), 700);
 }, 800);
 
+/* ANTI-FLICKER: count-up только при навигации на новый экран */
 window.App.hooks.afterGo.push(name => {
+  const screen = document.querySelector('.screen.active');
+  if (screen && screen.classList.contains('no-enter')) return;
   requestAnimationFrame(runCountUps);
 });
 
-console.log('[UX Enhancements] v2.0 loaded');
+console.log('[UX Enhancements] v2.2 loaded');
 })();
