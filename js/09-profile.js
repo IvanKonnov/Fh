@@ -1,4 +1,4 @@
-/* ═══ NAVLIFE · PROFILE · v4.3 (clean themes) ═══ */
+/* ═══ NAVLIFE · PROFILE · v4.5 (No XP) ═══ */
 (function(){
 'use strict';
 const N = window.__nav;
@@ -7,7 +7,7 @@ const qs = (s, r=document) => r.querySelector(s);
 const qsa = (s, r=document) => Array.from(r.querySelectorAll(s));
 const _esc = (s) => String(s??'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-const { go, saveState, esc, levelInfo, applyTheme, toast, openModal, closeModal,
+const { go, saveState, esc, applyTheme, toast, openModal, closeModal,
         SFX, buzz, todayKey, resetState, avatarHtml } = N;
 
 const AVATARS = ['🧠','🚀','🦉','🐺','🦊','🐙','🌟','⚡','🎯','🧩','🦁','🐬'];
@@ -37,12 +37,8 @@ function ensureStyles(){
 .profile-avatar img{width:100%;height:100%;object-fit:cover;}
 .profile-name{ font-family:'Fraunces',serif; font-size:22px;font-weight:600;color:var(--hero-text); letter-spacing:-.01em;line-height:1.1; }
 .profile-sub{ font-size:12.5px;color:var(--hero-text-dim);margin-top:4px; }
-.profile-level-chip{ display:inline-flex;align-items:center;gap:6px; padding:4px 12px;border-radius:100px; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.2); color:var(--amber-soft);font-weight:600;font-size:11.5px; margin-top:8px; letter-spacing:.04em; }
 .profile-edit-btn{ position:absolute;right:20px;top:20px;z-index:2; width:36px;height:36px;border-radius:50%; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.2); color:var(--hero-text);display:grid;place-items:center;font-size:14px; cursor:pointer;transition:background .15s; }
 .profile-edit-btn:hover{background:rgba(255,255,255,.22)}
-.profile-xp-bar{ margin-top:14px; height:6px;border-radius:4px; background:rgba(255,255,255,.14); overflow:hidden;position:relative; }
-.profile-xp-fill{ height:100%;border-radius:4px; background:linear-gradient(90deg,var(--amber),var(--amber-soft)); transition:width .6s cubic-bezier(.22,1,.36,1); }
-.profile-xp-label{ display:flex;justify-content:space-between; font-size:11px;color:var(--hero-text-mute);margin-top:6px; font-weight:500; }
 .profile-tiles{ display:grid;grid-template-columns:1fr 1fr 1fr 1fr; gap:8px;margin-bottom:16px; }
 @media(max-width:400px){.profile-tiles{grid-template-columns:1fr 1fr}}
 .profile-tile{ padding:12px 10px;border-radius:14px;text-align:center; border:1px solid var(--line); background:var(--surface-raised); box-shadow:0 1px 0 0 rgba(255,255,255,.9) inset,0 6px 16px -10px rgba(27,33,29,.15); }
@@ -73,7 +69,7 @@ function ensureStyles(){
 .profile-goal-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;}
 .profile-goal-chip{ padding:8px 16px;border-radius:100px; font-size:13px;font-weight:600; border:1.5px solid var(--line); background:var(--paper);color:var(--ink); cursor:pointer;transition:all .15s; min-width:48px; }
 .profile-goal-chip.on{ background:var(--moss);color:#fff; border-color:var(--moss); box-shadow:0 6px 16px -6px rgba(63,97,82,.4); }
-.profile-data-actions{ display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px; padding:14px 16px; }
+.profile-data-actions{ display:grid;grid-template-columns:1fr 1fr;gap:8px; padding:14px 16px; }
 @media(max-width:400px){.profile-data-actions{grid-template-columns:1fr}}
 .profile-data-btn{ padding:12px 14px;border-radius:12px; font-size:12.5px;font-weight:600; background:var(--paper);color:var(--ink); border:1px solid var(--line); cursor:pointer;transition:all .15s; display:flex;flex-direction:column;align-items:center;gap:4px; }
 .profile-data-btn:hover{border-color:var(--moss);color:var(--moss)}
@@ -91,7 +87,6 @@ ensureStyles();
 
 function renderProfile(){
   const S = N.S;
-  const li = levelInfo(S.neurofit.xp);
   const leadTimes = S.shared.notificationLeadTimes || [1,5];
   const achTotal = (window.Achievements && window.Achievements.list || []).length;
   const achUnlocked = Object.keys(S.achievements || {}).length;
@@ -113,17 +108,6 @@ function renderProfile(){
         <div style="flex:1;min-width:0">
           <div class="profile-name">${_esc(S.shared.name)}</div>
           <div class="profile-sub">${S.neurofit.totalSessions} тренировок · ${Math.round((S.neurofit.totalMs||0)/60000)} мин</div>
-          <div class="profile-level-chip">⭐ Уровень ${li.level} · ${S.neurofit.xp} XP</div>
-        </div>
-      </div>
-      <div style="margin-top:16px">
-        <div class="profile-xp-bar">
-          <div class="profile-xp-fill" style="width:${(li.pct*100).toFixed(1)}%"></div>
-        </div>
-        <div class="profile-xp-label">
-          <span>Уровень ${li.level}</span>
-          <span>${li.into} / ${li.need} XP</span>
-          <span>Уровень ${li.level + 1}</span>
         </div>
       </div>
     </div>
@@ -272,7 +256,7 @@ function renderProfile(){
       <div class="profile-setting" style="flex-direction:column;align-items:stretch;gap:12px">
         <div>
           <div class="profile-setting-label">Резервное копирование</div>
-          <div class="profile-setting-desc">Всё хранится локально — сделай бэкап на всякий случай</div>
+          <div class="profile-setting-desc">Локальный файл на всякий случай</div>
         </div>
         <div class="profile-data-actions" style="padding:0">
           <button class="profile-data-btn" id="expBtn" type="button">
@@ -281,11 +265,19 @@ function renderProfile(){
           </button>
           <button class="profile-data-btn" id="impBtn" type="button">
             <span class="em">📥</span>
-            <span>Импорт</span>
+            <span>Импорт JSON</span>
           </button>
+        </div>
+      </div>
+      <div class="profile-setting" style="flex-direction:column;align-items:stretch;gap:12px">
+        <div>
+          <div class="profile-setting-label" style="color:var(--rust)">Опасная зона</div>
+          <div class="profile-setting-desc">Полный сброс прогресса</div>
+        </div>
+        <div class="profile-data-actions" style="padding:0;grid-template-columns:1fr">
           <button class="profile-data-btn danger" id="rstBtn" type="button">
             <span class="em">🗑</span>
-            <span>Сбросить</span>
+            <span>Стереть все данные</span>
           </button>
         </div>
       </div>
@@ -496,5 +488,5 @@ function importData(){
 
 window.App.registerScreen('profile', renderProfile);
 window.openHelpModal = openHelpModal;
-console.log('[Profile] v4.3 loaded');
+console.log('[Profile] v4.5 loaded');
 })();

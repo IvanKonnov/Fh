@@ -1,4 +1,4 @@
-/* ═══ NAVLIFE · NUTRITION · v4.5 · Fix data sync ═══ */
+/* ═══ NAVLIFE · NUTRITION · v4.6 · One-time Custom Food ═══ */
 (function(){
 'use strict';
 const N = window.__nav;
@@ -40,7 +40,6 @@ function getPlan(ds){ ensurePlansStore(); const p = N.S.nutrition.plans[ds]; if 
 function savePlan(ds, plan){ ensurePlansStore(); N.S.nutrition.plans[ds] = plan; saveState(); }
 function clearPlan(ds){ ensurePlansStore(); delete N.S.nutrition.plans[ds]; saveState(); }
 
-/* ═══ ЕДИНЫЙ ИСТОЧНИК ПРАВДЫ ДЛЯ КБЖУ ═══ */
 function nutritionToday(date){
   const ds = date || todayKey();
   if (!N.S.nutrition.days[ds]) N.S.nutrition.days[ds] = { meals:{breakfast:[],lunch:[],dinner:[],snack:[]}, water:0, notes:'' };
@@ -49,8 +48,6 @@ function nutritionToday(date){
   ['breakfast','lunch','dinner','snack'].forEach(k => { if (!d.meals[k]) d.meals[k] = []; });
 
   let kcal = 0, prot = 0, fat = 0, carb = 0;
-
-  // 1. Считаем еду
   ['breakfast','lunch','dinner','snack'].forEach(m => {
     (d.meals[m] || []).forEach(item => {
       const grams = item.grams !== undefined ? Number(item.grams) : 100;
@@ -62,7 +59,6 @@ function nutritionToday(date){
     });
   });
 
-  // 2. Считаем витамины
   const vitamins = N.S.nutrition.vitamins || [];
   const vLog = (N.S.nutrition.vitaminLog && N.S.nutrition.vitaminLog[ds]) || [];
   vLog.forEach(id => {
@@ -1159,6 +1155,14 @@ function openAddFoodModal(mealId, ds){
         <div class="field"><label>Углеводы/100г</label><input id="cfC" type="number" placeholder="0"></div>
       </div>
       <div class="field"><label>Граммы</label><input id="cfGrams" type="number" value="100" min="1"></div>
+      
+      <div class="field" style="margin-bottom:16px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0">
+          <input type="checkbox" id="cfSaveToDb" checked style="width:18px;height:18px;accent-color:var(--moss)">
+          <span style="font-size:13px">Сохранить в базу</span>
+        </label>
+      </div>
+
       <div style="display:flex;gap:10px">
         <button class="btn btn-ghost btn-full" id="cfCancel" type="button">Отмена</button>
         <button class="btn btn-primary btn-full" id="cfAdd" type="button">Добавить</button>
@@ -1273,8 +1277,13 @@ function openAddFoodModal(mealId, ds){
       const c = +m.querySelector('#cfC').value || 0;
       const g = Math.max(1, +m.querySelector('#cfGrams').value || 100);
       if (!n || !kcal){ toast('Введи название и ккал'); return; }
-      if (!N.S.nutrition.myFoods) N.S.nutrition.myFoods = [];
-      N.S.nutrition.myFoods.push({ n, kcal, p, f, c, tag:'neutral', tier:'standard' });
+      
+      const saveToDb = m.querySelector('#cfSaveToDb').checked;
+      if (saveToDb) {
+        if (!N.S.nutrition.myFoods) N.S.nutrition.myFoods = [];
+        N.S.nutrition.myFoods.push({ n, kcal, p, f, c, tag:'neutral', tier:'standard' });
+      }
+      
       const day = N.S.nutrition.days[addFoodTarget.ds];
       day.meals[addFoodTarget.mealId].push({ n, grams: g, kcal, p, f, c, tag:'neutral', tier:'standard' });
       saveState(); closeModal(m); go('nutrition');

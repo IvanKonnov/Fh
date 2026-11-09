@@ -1,4 +1,4 @@
-const CACHE = 'navlife-v2';
+const CACHE = 'navlife-v1';
 const ASSETS = [
   './', './index.html', './manifest.json', './icon.svg',
   './css/base.css', './css/skin.css', './css/modules.css',

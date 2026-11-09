@@ -1,9 +1,9 @@
-/* ═══ NAVLIFE · STATS · v6.1 (Radar fix + Senior comparison) ═══ */
+/* ═══ NAVLIFE · STATS · v6.2 (No XP, Reflection back) ═══ */
 (function(){
 'use strict';
 const N = window.__nav;
 if (!N){ console.error('[STATS] __nav not found'); return; }
-const { go, esc, todayKey, fmtDate, levelInfo, dowShort, nutritionToday, itemsForDate } = N;
+const { go, esc, todayKey, fmtDate, dowShort, nutritionToday, itemsForDate } = N;
 
 /* ═══ ИНЖЕКТ СТИЛЕЙ ═══ */
 const STYLE_ID = 'navlife-stats-styles';
@@ -90,7 +90,7 @@ function collectDailyMetrics(daysBack = 30){
     const done = items.filter(x => x.completed).length;
     const total = items.length;
     const sessionsToday = S.neurofit.sessions.filter(s => s.d === ds);
-    const avgAccToday = sessionsToday.length ? avg(sessionsToday.map(s => s.acc)) : null;
+    const avgAccToday = sessionsToday.length ? avg(sessionsToday.map(s => s.acc || 0)) : null;
     const habitDone = (S.habits || []).filter(h => ((h.log||{})[ds] || 0) >= (h.target || 1)).length;
     const habitTotal = (S.habits || []).length;
 
@@ -303,7 +303,6 @@ function renderSeniorComparison() {
 function renderStats(){
   ensureStyles();
   const S = N.S;
-  const li = levelInfo(S.neurofit.xp);
   const todayDs = todayKey();
   const todayItems = itemsForDate(todayDs);
   const todayDone = todayItems.filter(i => i.completed).length;
@@ -341,9 +340,7 @@ function renderStats(){
   const maxV = Math.max(1, ...days.map(x => Math.max(x.trains, x.done)));
 
   const last = S.neurofit.sessions.slice(-30);
-  const avgAcc = last.length ? Math.round(last.reduce((a, b) => a + b.acc, 0) / last.length) : 0;
-  const rtArr = last.filter(x => x.rt > 0);
-  const avgRt = rtArr.length ? Math.round(rtArr.reduce((a, b) => a + b.rt, 0) / rtArr.length) : 0;
+  const avgAcc = last.length ? Math.round(last.reduce((a, b) => a + (b.acc || 0), 0) / last.length) : 0;
   const mins = Math.round(S.neurofit.totalMs / 60000);
 
   const summaries = simpleSummaries();
@@ -357,18 +354,14 @@ function renderStats(){
       <div class="hero-inner">
         <div class="between" style="align-items:flex-start;margin-bottom:14px">
           <div>
-            <div class="eyebrow">УРОВЕНЬ ${li.level}</div>
-            <div style="font-family:'Fraunces',serif;font-size:34px;font-weight:600;color:#fff;line-height:1;margin-top:4px">${li.into} / ${li.need} XP</div>
+            <div class="eyebrow">ТРЕНИРОВКИ МОЗГА</div>
+            <div style="font-family:'Fraunces',serif;font-size:34px;font-weight:600;color:#fff;line-height:1;margin-top:4px">${S.neurofit.totalSessions} <span style="font-size:18px;font-weight:400;opacity:.8">сессий</span></div>
           </div>
           <div style="text-align:right">
-            <div class="eyebrow" style="color:var(--hero-text-mute)">ВСЕГО</div>
-            <div style="font-family:'Fraunces',serif;font-size:24px;font-weight:600;color:var(--amber-soft);line-height:1;margin-top:6px">${S.neurofit.xp} XP</div>
+            <div class="eyebrow" style="color:var(--hero-text-mute)">ВРЕМЯ</div>
+            <div style="font-family:'Fraunces',serif;font-size:24px;font-weight:600;color:var(--amber-soft);line-height:1;margin-top:6px">${mins} мин</div>
           </div>
         </div>
-        <div style="height:6px;border-radius:4px;background:rgba(255,255,255,.15);overflow:hidden">
-          <div style="height:100%;width:${(li.pct*100).toFixed(1)}%;background:linear-gradient(90deg,var(--amber),var(--amber-soft));border-radius:4px;transition:width .5s"></div>
-        </div>
-        <p style="color:var(--hero-text-dim);font-size:12.5px;margin-top:10px">До уровня ${li.level+1} — ${li.need - li.into} XP</p>
       </div>
     </div>
 
@@ -386,16 +379,6 @@ function renderStats(){
         <div style="font-family:'Fraunces',serif;font-size:26px;font-weight:600;line-height:1">${S.neurofit.bestStreak}</div>
         <div class="tiny" style="margin-top:4px">РЕКОРД СЕРИИ</div>
       </div>
-      <div class="card" style="margin:0;padding:16px;text-align:center">
-        <div style="font-size:28px;margin-bottom:4px">🧠</div>
-        <div style="font-family:'Fraunces',serif;font-size:26px;font-weight:600;line-height:1">${S.neurofit.totalSessions}</div>
-        <div class="tiny" style="margin-top:4px">ТРЕНИРОВОК</div>
-      </div>
-      <div class="card" style="margin:0;padding:16px;text-align:center">
-        <div style="font-size:28px;margin-bottom:4px">⏱</div>
-        <div style="font-family:'Fraunces',serif;font-size:26px;font-weight:600;line-height:1">${mins}<span style="font-size:14px;font-weight:500"> мин</span></div>
-        <div class="tiny" style="margin-top:4px">В ТРЕНИРОВКАХ</div>
-      </div>
     </div>
 
     ${summaries.length ? `
@@ -412,6 +395,9 @@ function renderStats(){
         </div>
       </div>
     ` : ''}
+
+    <div id="stats-reflection-slot"></div>
+    <div id="stats-achievements-slot"></div>
 
     <div class="card">
       <div class="between" style="margin-bottom:12px">
@@ -458,7 +444,6 @@ function renderStats(){
       </div>
     </div>
 
-    <div id="stats-achievements-slot"></div>
     <div style="height:20px"></div>`;
 
   return root;
@@ -469,6 +454,15 @@ window.App.registerScreen('stats', renderStats);
 window.App.hooks.afterGo.push(name => {
   if (name !== 'stats') return;
   requestAnimationFrame(() => {
+    if (window.Reflection && window.Reflection.statsCard) {
+      const slot = document.querySelector('#stats-reflection-slot');
+      if (slot) slot.innerHTML = window.Reflection.statsCard();
+    }
+    const rb = document.querySelector('#statsReflectBtn');
+    if (rb) rb.onclick = () => window.Reflection && window.Reflection.open();
+    const rh = document.querySelector('#statsReflectHistBtn');
+    if (rh) rh.onclick = () => window.Reflection && window.Reflection.history();
+
     if (window.Achievements && window.Achievements.previewCard) {
       const slot = document.querySelector('#stats-achievements-slot');
       if (slot) slot.innerHTML = window.Achievements.previewCard();

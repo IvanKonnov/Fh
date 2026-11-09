@@ -1,4 +1,4 @@
-/* ═══ NAVLIFE · HOME · v2.5 (Safe water) ═══ */
+/* ═══ NAVLIFE · HOME · v2.6 (Streak-based brain) ═══ */
 (function(){
 'use strict';
 const N = window.__nav;
@@ -24,26 +24,22 @@ function renderToday(){
   const stat = computeDailyStats(ds);
   const nut = nutritionToday();
   
-  // Защита от некорректных данных воды
   const safeWater = Math.min(Number(nut.water) || 0, 10000);
   const waterL = (safeWater / 1000).toFixed(1);
   
   const kcalPct = Math.round(nut.kcal / Math.max(1, N.S.nutrition.goals.calories) * 100);
 
-  /* Проверка на Идеальный день */
   const habitsTotal = (N.S.habits || []).length;
   const habitsDone = (N.S.habits || []).filter(h => ((h.log||{})[ds] || 0) >= (h.target||1)).length;
   const isPerfectDay = items.length > 0 && stat.completed === items.length && (habitsTotal === 0 || habitsDone === habitsTotal);
 
-  /* ─── СИНХРОННЫЙ РЕНДЕР СЛОТОВ ─── */
   const moodHtml    = (window.Mood   && window.Mood.strip)     ? window.Mood.strip()       : '';
   const sleepHtml   = (window.Sleep  && window.Sleep.todayCard) ? window.Sleep.todayCard() : '';
   const habitsHtml  = (window.Habits && window.Habits.homeCard) ? window.Habits.homeCard() : '';
   const eodHtml     = '<button class="btn btn-ghost btn-full" data-eod-open type="button" style="margin-top:14px">📋 Итог дня</button>';
 
-  /* ─── СТАТУС БАР ─── */
   const focusSessionsToday = N.S.neurofit.sessions.filter(s => s.d === ds).length;
-  const focusMinToday = focusSessionsToday * 3; // Примерно 3 мин на сессию
+  const focusMinToday = focusSessionsToday * 3;
   const streak = N.S.neurofit.streak;
 
   const statusBarHtml = `
@@ -158,7 +154,7 @@ function renderToday(){
     <div class="card tappable" style="margin-top:16px;background:var(--amber-soft);border-color:transparent" data-goto="brain">
       <div class="between">
         <div>
-          <div class="tiny" style="color:var(--amber-dim)">Уровень ${levelInfo(N.S.neurofit.xp).level} · ${N.S.neurofit.totalSessions} сессий</div>
+          <div class="tiny" style="color:var(--amber-dim)">${N.S.neurofit.totalSessions} сессий</div>
           <div style="font-size:16px;font-weight:600;margin-top:6px;color:var(--amber-dim)">🧠 Тренировка мозга</div>
         </div>
         <div style="font-size:32px">→</div>

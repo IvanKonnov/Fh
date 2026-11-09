@@ -12,7 +12,6 @@
   --r-sm:9px;--r:12px;--r-lg:14px;--r-xl:20px;--r-pill:100px;
   --ease:cubic-bezier(.22,1,.36,1);--dur:.18s;
 
-  /* Базовые переменные для тем */
   --hero-bg: linear-gradient(155deg,#22302A 0%,#1B211D 62%);
   --hero-text: #F4F2EA;
   --hero-text-dim: #C7CEC5;
@@ -218,7 +217,6 @@ html[data-theme="dark"] .bar{background:var(--line-soft)}
 .route-item.done .route-title{color:var(--ink-soft);text-decoration:line-through;text-decoration-color:var(--line)}
 .route-item.skipped .route-title{color:var(--rust)}
 
-/* Остальные стили оставлены без изменений, чтобы не раздувать файл */
 .sched-row{display:flex;align-items:center;gap:12px;padding:12px 4px;border-bottom:1px solid var(--line);position:relative;transition:transform .18s var(--ease),box-shadow .18s var(--ease);cursor:grab}
 .sched-row:last-child{border-bottom:none}
 .sched-row.dragging{box-shadow:0 12px 32px rgba(0,0,0,.18);background:var(--surface-raised);
@@ -349,10 +347,11 @@ html[data-theme="dark"] .toast.gold{color:#0A0A0A}
 .field{margin-bottom:14px}
 .field label{display:block;font-size:12.5px;font-weight:600;color:var(--ink-soft);margin-bottom:6px}
 .field input,.field select,.field textarea{width:100%;border:1px solid var(--line);border-radius:9px;
-  padding:10px 12px;font-size:14px;font-family:inherit;background:var(--surface);color:var(--ink);min-height:42px}
+  padding:10px 12px;font-size:14px;font-family:inherit;background:var(--surface);color:var(--ink);min-height:42px;box-sizing:border-box;}
 .field textarea{resize:vertical;min-height:60px}
 .field-row{display:flex;gap:10px}
-.field-row .field{flex:1}
+.field-row .field{flex:1;min-width:0}
+.field input[type="time"]{width:100%;min-width:0;box-sizing:border-box;text-align:center;}
 .avatar-preview{width:120px;height:120px;margin:0 auto 16px;border-radius:50%;overflow:hidden;
   background:var(--surface);border:2px solid var(--line);display:grid;place-items:center;font-size:56px}
 .avatar-preview img{width:100%;height:100%;object-fit:cover}

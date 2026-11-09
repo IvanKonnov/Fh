@@ -1,16 +1,15 @@
-/* ═══ NAVLIFE · BRAIN · 19 упражнений ═══ */
+/* ═══ NAVLIFE · BRAIN · v3.0 · Streak-based ═══ */
 (function(){
 'use strict';
 const N = window.__nav;
 const { go, esc, saveState, toast, openModal, closeModal, SFX, buzz, flash,
-        levelInfo, todayKey, clamp, rnd, pick, shuffle, uid, TIMEOUT,
+        todayKey, clamp, rnd, pick, shuffle, uid, TIMEOUT,
         LEVEL_NAMES, STREAK_TO_LEVELUP, $, $$, sleep } = N;
 
 const CATS = { memory:{name:'Память',icon:'🧠'}, speed:{name:'Внимание',icon:'⚡'}, math:{name:'Счёт',icon:'🔢'}, logic:{name:'Логика',icon:'🧩'} };
 const MODES = {
-  normal:{ id:'normal', name:'Тренировка', emoji:'📋', desc:'Фиксированное число раундов.' },
-  endless:{ id:'endless', name:'Бесконечный', emoji:'♾️', desc:'Каждые 10 подряд — сложнее.' },
-  survival:{ id:'survival', name:'До ошибки', emoji:'💀', desc:'Одна ошибка — конец.' }
+  endless:{ id:'endless', name:'Бесконечный', emoji:'♾️', desc:'Ошибка сбрасывает серию, но игра продолжается. Каждые 10 подряд — сложнее.' },
+  survival:{ id:'survival', name:'До ошибки', emoji:'💀', desc:'Одна ошибка — конец сессии.' }
 };
 const EX = {};
 
@@ -29,7 +28,7 @@ EX.nback={id:'nback',name:'N-back',cat:'memory',icon:'🧠',tag:'Рабочая 
       {N:4,pool:'БКМНРСТАЕЛ'.split(''),ms:1500,total:28,matchP:.25},
       {N:4,pool:'0123456789'.split(''),ms:1300,total:30,matchP:.25}
     ];
-    const maxRounds=api.mode!=='normal'?9999:cfg[Math.min(api.level,cfg.length)-1].total;
+    const maxRounds=9999;
     host.innerHTML=`<div class="stim-stage"><div class="stim" id="nbL">•</div></div>
       <button class="big-action" id="nbBtn" type="button">✓ Совпало</button>`;
     const L=$('#nbL',host),btn=$('#nbBtn',host);
@@ -70,7 +69,7 @@ EX.gridmem={id:'gridmem',name:'Сетка памяти',cat:'memory',icon:'🔲'
   defaultLevel:1,
   async run(host,api){
     const cfg=[{size:4,count:6,ms:1300},{size:5,count:7,ms:1200},{size:5,count:8,ms:1100},{size:6,count:9,ms:1000},{size:6,count:10,ms:900},{size:7,count:12,ms:800}];
-    const maxR=api.mode==='normal'?4:9999;
+    const maxR=9999;
     host.innerHTML=`<p class="muted" id="gmH" style="text-align:center;margin-bottom:14px">Приготовься…</p><div class="grid" id="gmG"></div>`;
     const grid=$('#gmG',host),hint=$('#gmH',host);
     let good=0,errs=0;
@@ -125,7 +124,7 @@ EX.simon={id:'simon',name:'Последовательность',cat:'memory',ic
   defaultLevel:1,
   async run(host,api){
     const cfg=[{colors:4,start:4,showMs:480,gapMs:160},{colors:4,start:5,showMs:440,gapMs:150},{colors:4,start:6,showMs:400,gapMs:140},{colors:6,start:5,showMs:360,gapMs:130},{colors:6,start:6,showMs:320,gapMs:120},{colors:6,start:7,showMs:280,gapMs:100}];
-    const maxR=api.mode==='normal'?5:9999;
+    const maxR=9999;
     const COLORS=['#3F6152','#B87F35','#4F7563','#A4503A','#8FAE9B','#D9A85E'];
     host.innerHTML=`<p class="muted" id="smH" style="text-align:center;margin-bottom:14px">Приготовься…</p><div class="pad" id="smP"></div>`;
     const pad=$('#smP',host),hint=$('#smH',host);
@@ -133,7 +132,7 @@ EX.simon={id:'simon',name:'Последовательность',cat:'memory',ic
     for(let r=0;r<maxR;r++){
       if(api.cancelled) break;
       const c=cfg[Math.min(api.level,cfg.length)-1];
-      const len=c.start+(api.mode==='normal'?r:Math.floor(api.streak/10)*3);
+      const len=c.start+Math.floor(api.streak/10)*3;
       const cols=c.colors<=4?2:3;
       pad.style.gridTemplateColumns=`repeat(${cols},1fr)`;
       pad.style.maxWidth=(cols*130)+'px';
@@ -189,55 +188,62 @@ EX.simon={id:'simon',name:'Последовательность',cat:'memory',ic
   }};
 
 EX.pairs={id:'pairs',name:'Парные карточки',cat:'memory',icon:'🃏',tag:'Память',
-  about:'Найди все пары.',how:['Открывай по две.','Запоминай.','Найди все.'],
-  hint:'Начинай с углов.',levels:['6 пар','8 пар','10 пар','12 пар','15 пар','18 пар'],
+  about:'Найди все пары.',how:['Открывай по две.','Запоминай.','Найди все.'],hint:'Начинай с углов.',levels:['6 пар','8 пар','10 пар','12 пар','15 пар','18 пар'],
   defaultLevel:1,
   async run(host,api){
-    const cfg=[{pairs:6,cols:4},{pairs:8,cols:4},{pairs:10,cols:5},{pairs:12,cols:6},{pairs:15,cols:6},{pairs:18,cols:6}];
-    const c=cfg[Math.min(api.level,cfg.length)-1];
-    const POOL=['🍀','🔥','💎','🌙','⚡','🎯','🌊','🪐','🎵','🦋','🌸','🍎','🎲','🗝','⚓','🧩','🌺','⭐'];
-    const chosen=shuffle(POOL).slice(0,c.pairs);
-    const deck=shuffle([...chosen,...chosen]);
-    host.innerHTML=`<div class="grid" id="prG" style="grid-template-columns:repeat(${c.cols},1fr);max-width:440px"></div>
-      <div class="ex-hud" style="margin-top:16px">
-        <span class="hud-pill">Ходы <b id="prM">0</b></span>
-        <span class="hud-pill">Пары <b id="prF">0</b>/${c.pairs}</span>
-      </div>`;
-    const grid=$('#prG',host),mEl=$('#prM',host),fEl=$('#prF',host);
-    grid.innerHTML=deck.map((s,i)=>`<div class="cell" data-i="${i}" style="font-size:${c.pairs>=12?18:24}px"></div>`).join('');
-    const cells=$$('.cell',grid);
-    let first=null,lock=false,moves=0,found=0;
-    await new Promise(resolve=>{
-      cells.forEach((cell,i)=>{
-        cell.onclick=async()=>{
-          if(lock||api.cancelled) return;
-          if(cell.classList.contains('ok')||cell===first) return;
-          cell.textContent=deck[i];cell.classList.add('lit');
-          SFX.tap();buzz(6);
-          if(!first){first={cell,i};return;}
-          moves++;mEl.textContent=moves;
-          if(deck[first.i]===deck[i]){
-            first.cell.classList.remove('lit');cell.classList.remove('lit');
-            first.cell.classList.add('ok');cell.classList.add('ok');
-            first=null;found++;fEl.textContent=found;
-            SFX.ok();flash('ok');api.progress(found/c.pairs);
-            if(found===c.pairs) resolve();
-          }else{
-            lock=true;SFX.err();const a=first;first=null;
-            await api.delay(600);
-            if(api.cancelled) return;
-            a.cell.textContent='';a.cell.classList.remove('lit');
-            cell.textContent='';cell.classList.remove('lit');
-            lock=false;
-          }
-        };
+    while(!api.cancelled){
+      const cfg=[{pairs:6,cols:4},{pairs:8,cols:4},{pairs:10,cols:5},{pairs:12,cols:6},{pairs:15,cols:6},{pairs:18,cols:6}];
+      const c=cfg[Math.min(api.level,cfg.length)-1];
+      const POOL=['🍀','🔥','💎','🌙','⚡','🎯','🌊','🪐','🎵','🦋','🌸','🍎','🎲','🗝','⚓','🧩','🌺','⭐'];
+      const chosen=shuffle(POOL).slice(0,c.pairs);
+      const deck=shuffle([...chosen,...chosen]);
+      host.innerHTML=`<div class="grid" id="prG" style="grid-template-columns:repeat(${c.cols},1fr);max-width:440px"></div>
+        <div class="ex-hud" style="margin-top:16px">
+          <span class="hud-pill">Ходы <b id="prM">0</b></span>
+          <span class="hud-pill">Пары <b id="prF">0</b>/${c.pairs}</span>
+        </div>`;
+      const grid=$('#prG',host),mEl=$('#prM',host),fEl=$('#prF',host);
+      grid.innerHTML=deck.map((s,i)=>`<div class="cell" data-i="${i}" style="font-size:${c.pairs>=12?18:24}px"></div>`).join('');
+      const cells=$$('.cell',grid);
+      let first=null,lock=false,moves=0,found=0;
+      let won = false;
+      await new Promise(resolve=>{
+        cells.forEach((cell,i)=>{
+          cell.onclick=async()=>{
+            if(lock||api.cancelled) return;
+            if(cell.classList.contains('ok')||cell===first) return;
+            cell.textContent=deck[i];cell.classList.add('lit');
+            SFX.tap();buzz(6);
+            if(!first){first={cell,i};return;}
+            moves++;mEl.textContent=moves;
+            if(deck[first.i]===deck[i]){
+              first.cell.classList.remove('lit');cell.classList.remove('lit');
+              first.cell.classList.add('ok');cell.classList.add('ok');
+              first=null;found++;fEl.textContent=found;
+              SFX.ok();flash('ok');api.progress(found/c.pairs);
+              if(found===c.pairs) { won = true; resolve(); }
+            }else{
+              lock=true;SFX.err();const a=first;first=null;
+              await api.delay(600);
+              if(api.cancelled) return;
+              a.cell.textContent='';a.cell.classList.remove('lit');
+              cell.textContent='';cell.classList.remove('lit');
+              lock=false;
+              if(!api.recordResult(false)) { resolve(); return; }
+            }
+          };
+        });
+        api.onCancel(resolve);
       });
-      api.onCancel(resolve);
-    });
+      if(api.cancelled) break;
+      if(won) {
+        api.ok();
+        if(!api.recordResult(true)) break;
+      }
+      await api.delay(1000);
+    }
     if(api.cancelled) return;
-    const perfect=c.pairs*2;
-    const acc=Math.round(clamp(perfect/Math.max(perfect,moves),0,1)*100);
-    api.finish({acc,rt:0,level:api.level,detail:{'Ходов':moves,'Идеально':perfect}});
+    api.finish({acc:100,rt:0,level:api.level,detail:{}});
   }};
 
 EX.chunk={id:'chunk',name:'Чанкинг чисел',cat:'memory',icon:'🔢',tag:'Память',
@@ -246,7 +252,7 @@ EX.chunk={id:'chunk',name:'Чанкинг чисел',cat:'memory',icon:'🔢',t
   defaultLevel:1,
   async run(host,api){
     const cfg=[{len:6,rev:false,ms:400},{len:7,rev:false,ms:380},{len:8,rev:false,ms:350},{len:9,rev:false,ms:330},{len:10,rev:false,ms:300},{len:12,rev:true,ms:280}];
-    const maxR=api.mode==='normal'?6:9999;
+    const maxR=9999;
     host.innerHTML=`<div class="stim-stage" style="min-height:140px"><div class="stim" id="ckS" style="font-size:clamp(26px,8vw,44px)">—</div></div>
       <p class="muted" id="ckR" style="text-align:center;margin-top:6px;font-size:12.5px;min-height:16px"></p>
       <form class="answer-bar" id="ckF" style="display:none" autocomplete="off">
@@ -293,49 +299,55 @@ EX.schulte={id:'schulte',name:'Таблица Шульте',cat:'speed',icon:'�
   hint:'Держи взгляд в центре.',levels:['4×4','5×5','5×5 цвет','6×6','6×6 альт','7×7'],
   defaultLevel:1,
   async run(host,api){
-    const cfg=[{size:4,colored:false,alt:false},{size:5,colored:false,alt:false},{size:5,colored:true,alt:false},{size:6,colored:false,alt:false},{size:6,colored:false,alt:true},{size:7,colored:false,alt:false}];
-    const c=cfg[Math.min(api.level,cfg.length)-1];
-    const size=c.size,total=size*size;
-    let sequence;
-    if(c.alt){const ev=[],od=[];for(let i=1;i<=total;i++)(i%2===0?ev:od).push(i);sequence=[...ev.sort((a,b)=>a-b),...od.sort((a,b)=>b-a)];}
-    else sequence=Array.from({length:total},(_,i)=>i+1);
-    const nums=shuffle(sequence.slice());
-    const CM={};
-    if(c.colored){const pal=['#A4503A','#4F7563','#3F6152','#B87F35','#8FAE9B'];nums.forEach((n,i)=>CM[n]=pal[i%pal.length]);}
-    host.innerHTML=`<div class="grid" id="scG" style="grid-template-columns:repeat(${size},1fr);max-width:${size>=6?440:400}px"></div>
-      <div class="ex-hud" style="margin-top:16px">
-        <span class="hud-pill">След. <b id="scN">${sequence[0]}</b></span>
-        <span class="hud-pill">Время <b id="scT">0.0</b></span>
-      </div>`;
-    const grid=$('#scG',host),nEl=$('#scN',host),tEl=$('#scT',host);
-    grid.innerHTML=nums.map(n=>`<div class="cell" data-n="${n}" style="font-size:${size>=6?14:size===5?16:22}px;${c.colored?`color:${CM[n]}`:''}">${n}</div>`).join('');
-    const cells=$$('.cell',grid);
-    let idx=0,errors=0;
-    const t0=performance.now();
-    const timer=setInterval(()=>{if(api.cancelled) return;tEl.textContent=((performance.now()-t0)/1000).toFixed(1);},100);
-    api.onCancel(()=>clearInterval(timer));
-    await new Promise(resolve=>{
-      cells.forEach(cell=>{
-        cell.onclick=()=>{
-          if(api.cancelled) return;
-          const n=+cell.dataset.n;
-          if(n===sequence[idx]){
-            cell.classList.add('done');SFX.tap();buzz(6);
-            idx++;api.progress(idx/total);
-            nEl.textContent=idx<total?sequence[idx]:'✓';
-            if(idx>=total) resolve();
-          }else{errors++;flash('bad');SFX.err();cell.classList.add('bad');setTimeout(()=>cell.classList.remove('bad'),320);}
-        };
+    while(!api.cancelled){
+      const cfg=[{size:4,colored:false,alt:false},{size:5,colored:false,alt:false},{size:5,colored:true,alt:false},{size:6,colored:false,alt:false},{size:6,colored:false,alt:true},{size:7,colored:false,alt:false}];
+      const c=cfg[Math.min(api.level,cfg.length)-1];
+      const size=c.size,total=size*size;
+      let sequence;
+      if(c.alt){const ev=[],od=[];for(let i=1;i<=total;i++)(i%2===0?ev:od).push(i);sequence=[...ev.sort((a,b)=>a-b),...od.sort((a,b)=>b-a)];}
+      else sequence=Array.from({length:total},(_,i)=>i+1);
+      const nums=shuffle(sequence.slice());
+      const CM={};
+      if(c.colored){const pal=['#A4503A','#4F7563','#3F6152','#B87F35','#8FAE9B'];nums.forEach((n,i)=>CM[n]=pal[i%pal.length]);}
+      host.innerHTML=`<div class="grid" id="scG" style="grid-template-columns:repeat(${size},1fr);max-width:${size>=6?440:400}px"></div>
+        <div class="ex-hud" style="margin-top:16px">
+          <span class="hud-pill">След. <b id="scN">${sequence[0]}</b></span>
+          <span class="hud-pill">Время <b id="scT">0.0</b></span>
+        </div>`;
+      const grid=$('#scG',host),nEl=$('#scN',host),tEl=$('#scT',host);
+      grid.innerHTML=nums.map(n=>`<div class="cell" data-n="${n}" style="font-size:${size>=6?14:size===5?16:22}px;${c.colored?`color:${CM[n]}`:''}">${n}</div>`).join('');
+      const cells=$$('.cell',grid);
+      let idx=0,errors=0;
+      const t0=performance.now();
+      const timer=setInterval(()=>{if(api.cancelled) return;tEl.textContent=((performance.now()-t0)/1000).toFixed(1);},100);
+      api.onCancel(()=>clearInterval(timer));
+      let gameOver = false;
+      await new Promise(resolve=>{
+        cells.forEach(cell=>{
+          cell.onclick=()=>{
+            if(api.cancelled) return;
+            const n=+cell.dataset.n;
+            if(n===sequence[idx]){
+              cell.classList.add('done');SFX.tap();buzz(6);
+              idx++;api.progress(idx/total);
+              nEl.textContent=idx<total?sequence[idx]:'✓';
+              if(idx>=total) resolve();
+            }else{
+              errors++;flash('bad');SFX.err();cell.classList.add('bad');setTimeout(()=>cell.classList.remove('bad'),320);
+              if(!api.recordResult(false)) { gameOver = true; resolve(); }
+            }
+          };
+        });
+        api.onCancel(resolve);
       });
-      api.onCancel(resolve);
-    });
-    clearInterval(timer);
+      clearInterval(timer);
+      if(api.cancelled || gameOver) break;
+      api.ok();
+      if(!api.recordResult(true)) break;
+      await api.delay(1000);
+    }
     if(api.cancelled) return;
-    const secs=(performance.now()-t0)/1000;
-    const norms=[16,28,32,44,52,70];
-    const norm=norms[Math.min(api.level,norms.length)-1];
-    const acc=clamp(Math.round(norm/secs*100-errors*4),5,100);
-    api.finish({acc,rt:Math.round(secs*1000/total),level:api.level,detail:{'Время':secs.toFixed(1)+'с','Ошибок':errors}});
+    api.finish({acc:100,rt:0,level:api.level,detail:{}});
   }};
 
 EX.stroop={id:'stroop',name:'Струп-тест',cat:'speed',icon:'🌈',tag:'Торможение',
@@ -344,7 +356,7 @@ EX.stroop={id:'stroop',name:'Струп-тест',cat:'speed',icon:'🌈',tag:'�
   defaultLevel:1,
   async run(host,api){
     const cfg=[{colors:6,mismatchP:.5,ms:2600,swap:false},{colors:6,mismatchP:.7,ms:2400,swap:false},{colors:6,mismatchP:.85,ms:2200,swap:false},{colors:6,mismatchP:.9,ms:1800,swap:false},{colors:6,mismatchP:.95,ms:1600,swap:false},{colors:6,mismatchP:.95,ms:1500,swap:true}];
-    const maxR=api.mode==='normal'?20:9999;
+    const maxR=9999;
     const ALL=[{n:'КРАСНЫЙ',c:'#A4503A'},{n:'СИНИЙ',c:'#3F5A7A'},{n:'ЗЕЛЁНЫЙ',c:'#3F6152'},{n:'ЖЁЛТЫЙ',c:'#B87F35'},{n:'ФИОЛЕТОВЫЙ',c:'#6A4A7A'},{n:'РОЗОВЫЙ',c:'#A4507A'}];
     const c=cfg[Math.min(api.level,cfg.length)-1];const set=ALL.slice(0,c.colors);
     host.innerHTML=`<p class="muted" id="stR" style="text-align:center;margin-bottom:12px;font-size:12.5px;min-height:18px">${c.swap?'Правило: ЦВЕТ ШРИФТА':'&nbsp;'}</p>
@@ -397,7 +409,7 @@ EX.gonogo={id:'gonogo',name:'Go / No-Go',cat:'speed',icon:'🚦',tag:'Самок
   defaultLevel:1,
   async run(host,api){
     const speeds=[900,750,600,480,380,300],goP=[.68,.66,.64,.62,.60,.58];
-    const maxR=api.mode==='normal'?24:9999;
+    const maxR=9999;
     host.innerHTML=`<div class="stim-stage" style="min-height:280px"><div id="ggC" style="width:140px;height:140px;border-radius:50%;background:var(--paper);border:2px solid var(--line);transition:all .12s"></div></div>
       <p class="muted" style="text-align:center" id="ggH">Приготовься…</p>`;
     const circle=$('#ggC',host),hint=$('#ggH',host);
@@ -440,7 +452,7 @@ EX.flanker={id:'flanker',name:'Фланкер-тест',cat:'speed',icon:'➡️
   defaultLevel:1,
   async run(host,api){
     const cfg=[{arrows:5,mismatchP:0,ms:2800},{arrows:5,mismatchP:.6,ms:2600},{arrows:5,mismatchP:.8,ms:2200},{arrows:5,mismatchP:.9,ms:1600},{arrows:7,mismatchP:.9,ms:1400},{arrows:7,mismatchP:.95,ms:1200}];
-    const maxR=api.mode==='normal'?20:9999;
+    const maxR=9999;
     host.innerHTML=`<div class="stim-stage" style="min-height:150px"><div class="stim text" id="flS" style="font-size:clamp(26px,8vw,42px);letter-spacing:.12em">—</div></div>
       <div class="pad" style="grid-template-columns:1fr 1fr;margin-top:14px;max-width:420px">
         <button class="pad-btn" data-d="L" type="button">← Влево</button>
@@ -489,7 +501,7 @@ EX.ruleswitch={id:'ruleswitch',name:'Переключение правил',cat:
     const cfg=[{colors:3,shapes:2,swapEvery:6,ms:3000},{colors:3,shapes:2,swapEvery:5,ms:2800},{colors:3,shapes:3,swapEvery:4,ms:2400},{colors:4,shapes:3,swapEvery:4,ms:2000},{colors:4,shapes:4,swapEvery:3,ms:1700},{colors:4,shapes:4,swapEvery:2,ms:1400}];
     const COLORS=['#A4503A','#3F5A7A','#3F6152','#B87F35'];
     const SHAPES=[{sym:'●'},{sym:'■'},{sym:'▲'},{sym:'◆'}];
-    const maxR=api.mode==='normal'?20:9999;
+    const maxR=9999;
     host.innerHTML=`<p id="rsR" style="text-align:center;font-size:13px;font-weight:600;margin-bottom:12px;padding:10px;border-radius:12px;background:var(--moss-soft);color:var(--moss)">По цвету</p>
       <div class="stim-stage" style="min-height:160px"><div id="rsC" style="font-size:96px;line-height:1">●</div></div>
       <div class="pad" id="rsP" style="grid-template-columns:1fr 1fr;margin-top:14px;max-width:420px"></div>`;
@@ -547,7 +559,7 @@ EX.math={id:'math',name:'Быстрый счёт',cat:'math',icon:'➗',tag:'У�
       else{const t=rnd(5);if(t===0){a=3+rnd(6);b=2+rnd(4);c=2+rnd(4);ans=a**b+c*c;text=`${a}^${b}+${c}²`;}else if(t===1){a=[5,10,15,20,25,30,40,50][rnd(8)];b=[80,120,160,200,240,300,400,500][rnd(8)];ans=a*b/100;text=`${a}% от ${b}`;}else if(t===2){a=3+rnd(10);b=4+rnd(10);c=3+rnd(9);d=2+rnd(7);ans=a*b+c*d;text=`${a}×${b}+${c}×${d}`;}else if(t===3){b=3+rnd(6);const dv=3+rnd(10);a=b*dv;c=2+rnd(9);ans=dv+c*c;text=`${a}÷${b}+${c}²`;}else{const sq=[144,169,196,225,256,289][rnd(6)];a=Math.sqrt(sq);b=3+rnd(10);c=4+rnd(20);ans=a*b-c;text=`√${sq}×${b}−${c}`;}}
       return {text,ans};
     }
-    const maxR=api.mode==='normal'?ROUNDS[Math.min(api.level,ROUNDS.length)-1]:9999;
+    const maxR=9999;
     host.innerHTML=`<div class="stim-stage" style="min-height:130px"><div class="stim text" id="mtT" style="font-size:clamp(24px,7.5vw,40px)">—</div></div>
       <form class="answer-bar" id="mtF" autocomplete="off">
         <input class="answer-input" id="mtI" inputmode="decimal" placeholder="Ответ">
@@ -590,7 +602,7 @@ EX.chains={id:'chains',name:'Цепочки вычислений',cat:'math',ico
   hint:'Считай пошагово.',levels:['4 оп','5 оп','5 ×÷','6','7','8 микс'],defaultLevel:1,
   async run(host,api){
     const cfg=[{len:4,ops:['+','-'],range:[1,20],ms:9000},{len:5,ops:['+','-'],range:[1,25],ms:11000},{len:5,ops:['+','-','×','÷'],range:[1,15],ms:13000},{len:6,ops:['+','-','×','÷'],range:[1,15],ms:15000},{len:7,ops:['+','-','×','÷'],range:[1,12],ms:18000},{len:8,ops:['+','-','×','÷'],range:[1,10],ms:22000}];
-    const maxR=api.mode==='normal'?6:9999;
+    const maxR=9999;
     host.innerHTML=`<div class="stim-stage" style="min-height:220px"><div id="chC" style="text-align:center;font-size:20px;font-weight:600;line-height:1.7"></div></div>
       <form class="answer-bar" id="chF" autocomplete="off">
         <input class="answer-input" id="chI" inputmode="numeric" placeholder="Итог">
@@ -651,7 +663,7 @@ EX.compare={id:'compare',name:'Сравнение выражений',cat:'math'
       else{const t=rnd(3);if(t===0){const a1=8+rnd(15),a2=6+rnd(15),a3=4+rnd(10),b1=8+rnd(15),b2=6+rnd(15),b3=4+rnd(10);la=`${a1}×${a2}−${a3}`;ra=`${b1}×${b2}−${b3}`;a=a1*a2-a3;b=b1*b2-b3;}else if(t===1){const pa=pick([12,18,22,28,32,38]),na=pick([150,250,350,450,550,650]),b1=8+rnd(15),b2=4+rnd(12),b3=5+rnd(20);la=`${pa}% от ${na}`;ra=`${b1}×${b2}+${b3}`;a=pa*na/100;b=b1*b2+b3;}else{const a1=3+rnd(6),a2=2+rnd(4),a3=3+rnd(8),b1=3+rnd(6),b2=2+rnd(4),b3=3+rnd(8);la=`${a1}³+${a3}`;ra=`${b1}²×${b2}+${b3}`;a=a1**3+a3;b=b1*b1*b2+b3;}}
       return {la,ra,a,b};
     }
-    const maxR=api.mode==='normal'?15:9999;
+    const maxR=9999;
     host.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:22px">
       <div class="card" style="text-align:center;padding:24px 12px;margin:0;font-size:17px;font-weight:600" id="cmpL">—</div>
       <div class="card" style="text-align:center;padding:24px 12px;margin:0;font-size:17px;font-weight:600" id="cmpR">—</div>
@@ -704,7 +716,7 @@ EX.percent={id:'percent',name:'Проценты и доли',cat:'math',icon:'�
       else{const t=rnd(4);if(t===0){const price=pick([800,1200,1600,2400]),d=pick([15,20,25,30]),tax=pick([8,10,12]);text=`${price}₽, −${d}%, +${tax}%`;ans=price*(1-d/100)*(1+tax/100);}else if(t===1){const p=pick([13,17,23,29,37]),n=pick([160,240,320,480,640]);text=`${p}% от ${n}`;ans=p/100*n;}else if(t===2){const total=pick([1000,1500,2000,2500]),p1=pick([20,25,30,35]),p2=pick([15,20,25]);text=`${p1}%+${p2}% от ${total}`;ans=total*(p1+p2)/100;}else{const price=pick([600,900,1200,1800]),up=pick([12,18,24]),down=pick([10,15,20]);text=`${price}₽ → +${up}% → −${down}%`;ans=price*(1+up/100)*(1-down/100);}}
       return {text,ans};
     }
-    const maxR=api.mode==='normal'?12:9999;
+    const maxR=9999;
     host.innerHTML=`<div class="stim-stage" style="min-height:150px"><div class="stim text" id="pcT" style="font-size:clamp(18px,5.5vw,28px);text-align:center;line-height:1.4">—</div></div>
       <form class="answer-bar" id="pcF" autocomplete="off">
         <input class="answer-input" id="pcI" inputmode="decimal" placeholder="Ответ">
@@ -750,7 +762,7 @@ EX.anagram={id:'anagram',name:'Анаграммы',cat:'logic',icon:'🔤',tag:'
       4:['МНОГООБРАЗИЕ','ВЗАИМОДЕЙСТВИЕ','ПРЕДСТАВЛЕНИЕ','ИССЛЕДОВАНИЕ'],
       5:['ПРОГРАММИРОВАНИЕ','ВЗАИМОПОНИМАНИЕ','СОВЕРШЕНСТВОВАНИЕ'],
       6:['АБСТРАГИРОВАНИЕ','ПЕРЕОСМЫСЛЕНИЕ','СИСТЕМАТИЗАЦИЯ']};
-    const maxR=api.mode==='normal'?8:9999;
+    const maxR=9999;
     host.innerHTML=`<div class="stim-stage" style="min-height:130px"><div class="stim text" id="anS" style="font-size:clamp(18px,5.5vw,28px);letter-spacing:.14em">—</div></div>
       <form class="answer-bar" id="anF" autocomplete="off">
         <input class="answer-input" id="anI" placeholder="Слово" style="font-size:16px;text-transform:uppercase">
@@ -805,7 +817,7 @@ EX.sequence={id:'sequence',name:'Последовательности',cat:'logi
       else{const a=1+rnd(15),b=80+rnd(40);arr=[a,b,a+4,b-4,a+8,b-8];next=a+12;}
       return {arr,next};
     }
-    const maxR=api.mode==='normal'?8:9999;
+    const maxR=9999;
     host.innerHTML=`<div class="stim-stage" style="min-height:130px"><div class="stim text" id="sqT" style="font-size:clamp(16px,5vw,26px)">—</div></div>
       <form class="answer-bar" id="sqF" autocomplete="off">
         <input class="answer-input" id="sqI" inputmode="numeric" placeholder="?">
@@ -857,7 +869,7 @@ EX.sudoku={id:'sudoku',name:'Судоку 4×4',cat:'logic',icon:'🔲',tag:'Л�
       }
       return true;
     }
-    const maxR=api.mode==='normal'?4:9999;
+    const maxR=9999;
     const hb=[5,6,7,8,9,10];
     let correct=0,total=0;
     for(let r=0;r<maxR;r++){
@@ -930,7 +942,7 @@ EX.magic={id:'magic',name:'Магический квадрат',cat:'logic',icon
       for(let i=0;i<ops%4;i++) m=rot(m);
       if(ops>=4) m=mir(m);
       return m;}
-    const maxR=api.mode==='normal'?5:9999;
+    const maxR=9999;
     const hb=[4,5,6,7,8,8];
     let correct=0,total=0;
     for(let r=0;r<maxR;r++){
@@ -1023,7 +1035,7 @@ EX.signs={id:'signs',name:'Расставь знаки',cat:'logic',icon:'➕',t
       }
       return {nums:[3,4,5,6],ops:['+','+','+'],target:18};
     }
-    const maxR=api.mode==='normal'?6:9999;
+    const maxR=9999;
     const D={'+':'+','-':'−','*':'×','/':'÷'};
     let correct=0,total=0;
     for(let r=0;r<maxR;r++){
@@ -1084,7 +1096,8 @@ window.CATS = CATS;
 function createApi(refs,level,mode){
   const api={
     level,mode,cancelled:false,paused:false,
-    streak:0,score:0,rounds:0,_handlers:[],_intervals:new Set(),
+    streak: 0, maxStreak: 0, rounds: 0,
+    _handlers:[],_intervals:new Set(),
     onCancel(fn){
       if(api.cancelled){fn();return ()=>{};}
       api._handlers.push(fn);
@@ -1149,8 +1162,9 @@ function createApi(refs,level,mode){
     recordResult(isCorrect){
       api.rounds++;
       if(isCorrect){
-        api.streak++;api.score++;
-        if(api.mode!=='normal'&&api.streak>0&&api.streak%STREAK_TO_LEVELUP===0&&api.level<6){
+        api.streak++;
+        api.maxStreak = Math.max(api.maxStreak, api.streak);
+        if(api.streak > 0 && api.streak % STREAK_TO_LEVELUP === 0 && api.level < 6){
           api.level++;
           refs.onLevelUp(api.level);
         }
@@ -1172,8 +1186,7 @@ function nextInQueue(){
   const ex=EX[id];
   if(!ex){nextInQueue();return;}
   const level=getEffectiveLevel(id,ex);
-  const man=(N.S.neurofit.manualDiff[id]||0)>0;
-  const mode=N.S.neurofit.preferredMode||'normal';
+  const mode=N.S.neurofit.preferredMode||'endless';
   const rec=N.S.neurofit.records[id]||{};
   openModal(`
     <div class="modal-handle"></div>
@@ -1197,7 +1210,6 @@ function nextInQueue(){
     <div style="padding:12px 14px;border-radius:var(--r);background:var(--paper);border:1px solid var(--line);margin-bottom:18px">
       <div class="tiny" style="margin-bottom:4px">Сложность</div>
       <div style="font-size:14px;font-weight:600">${LEVEL_NAMES[level-1]} — ${esc(ex.levels[level-1])}</div>
-      <div class="muted" style="font-size:11.5px;margin-top:3px">${man?'Вручную':'Адаптивная'}</div>
     </div>
     <button class="btn btn-primary btn-full btn-lg" id="exGo" type="button">Начать</button>
     <button class="btn btn-ghost btn-full" id="exHint" type="button" style="margin-top:10px">Подсказка</button>`,m=>{
@@ -1219,14 +1231,6 @@ function getEffectiveLevel(id,ex){
   if(man>0) return clamp(man,1,ex.levels.length);
   return clamp(N.S.neurofit.levels[id]||ex.defaultLevel,1,ex.levels.length);
 }
-function setRecord(id,mode,data){
-  if(!N.S.neurofit.records[id]) N.S.neurofit.records[id]={};
-  const cur=N.S.neurofit.records[id][mode];
-  const better=!cur||(data.score||0)>(cur.score||0);
-  if(better) N.S.neurofit.records[id][mode]=data;
-  saveState();
-  return better;
-}
 function runExercise(ex,level,mode){
   $('#nav').classList.add('hidden');
   const host=$('#screens');host.innerHTML='';
@@ -1239,13 +1243,12 @@ function runExercise(ex,level,mode){
       <div class="ex-title">${ex.icon} ${esc(ex.name)}</div>
       <button class="icon-btn" id="exHelp" type="button">?</button>
     </header>
-    ${mode!=='normal'?`<div class="mode-banner ${mode}">${md.emoji} ${esc(md.name)}</div>`:''}
+    <div class="mode-banner ${mode}">${md.emoji} ${esc(md.name)}</div>
     <div class="ex-bar"><i id="exBar"></i></div>
-    <div class="ex-hud" id="exHud">${mode!=='normal'?`
-      <span class="hud-pill moss">Очки <b id="hudScore">0</b></span>
+    <div class="ex-hud" id="exHud">
       <span class="hud-pill gold">🔥 <b id="hudStreak">0</b></span>
       <span class="hud-pill">Ур. <b id="hudLevel">${level}</b></span>
-    `:''}</div>
+    </div>
     <div class="ex-host" id="exHost"></div>`;
   host.appendChild(screen);
   const barEl=$('#exBar',screen);
@@ -1269,7 +1272,6 @@ function runExercise(ex,level,mode){
   const t0=Date.now();
   let finished=false;
   const updateHud=()=>{
-    const sc=$('#hudScore');if(sc) sc.textContent=api.score;
     const st=$('#hudStreak');if(st) st.textContent=api.streak;
     const lv=$('#hudLevel');if(lv) lv.textContent=api.level;
   };
@@ -1329,80 +1331,48 @@ function openHintModal(ex,onClose){
   });
 }
 function finishSession(ex,result,ms,api){
-  const acc=clamp(Math.round(result.acc||0),0,100);
-  const lvl=clamp(result.level||1,1,ex.levels.length);
-  const rt=Math.round(result.rt||0);
-  const man=(N.S.neurofit.manualDiff[ex.id]||0)>0;
-  const mode=api.mode;
-  let xp=12+Math.round(acc*0.35)+lvl*8;
-  if(rt>0&&rt<700) xp+=8;
-  if(mode!=='normal') xp+=Math.round(api.score*1.5);
-  let leveled=false,dropped=false;
-  if(mode==='normal'&&!man){
-    let nl=lvl;
-    if(acc>=82) nl=Math.min(6,lvl+1);
-    else if(acc<55) nl=Math.max(1,lvl-1);
-    if(nl>lvl){leveled=true;N.S.neurofit.levels[ex.id]=nl;}
-    else if(nl<lvl){dropped=true;N.S.neurofit.levels[ex.id]=nl;}
-    else N.S.neurofit.levels[ex.id]=lvl;
+  const maxStreak = api.maxStreak;
+  const mode = api.mode;
+  
+  let newRec = false;
+  if (!N.S.neurofit.records[ex.id]) N.S.neurofit.records[ex.id] = {};
+  const cur = N.S.neurofit.records[ex.id][mode];
+  if (!cur || maxStreak > (cur.score || 0)) {
+    N.S.neurofit.records[ex.id][mode] = { score: maxStreak, date: todayKey() };
+    newRec = true;
   }
-  let newRec=false;
-  if(mode!=='normal'){
-    newRec=setRecord(ex.id,mode,{score:api.score,acc,level:api.level,date:todayKey()});
-  }
-  N.S.neurofit.xp+=xp;
-  N.S.neurofit.totalSessions+=1;
-  N.S.neurofit.todayCount+=1;
-  N.S.neurofit.totalMs+=ms;
-  N.S.neurofit.catTried[ex.cat]=true;
-  N.S.neurofit.sessions.push({ex:ex.id,d:todayKey(),acc,rt,xp,lvl,mode,t:Date.now(),score:api.score});
-  if(N.S.neurofit.sessions.length>250) N.S.neurofit.sessions=N.S.neurofit.sessions.slice(-250);
-  N.refreshStreak();saveState();
-  SFX.win();buzz([18,40,18]);
+
+  N.S.neurofit.totalSessions += 1;
+  N.S.neurofit.todayCount += 1;
+  N.S.neurofit.totalMs += ms;
+  N.S.neurofit.catTried[ex.cat] = true;
+  N.S.neurofit.sessions.push({ ex: ex.id, d: todayKey(), score: maxStreak, mode, t: Date.now(), acc: result.acc, rt: result.rt });
+  if (N.S.neurofit.sessions.length > 250) N.S.neurofit.sessions = N.S.neurofit.sessions.slice(-250);
+
+  N.refreshStreak(); saveState();
+  SFX.win(); buzz([18,40,18]);
   if (window.Achievements) window.Achievements.check();
-  renderResult(ex,{acc,rt,xp,lvl,detail:result.detail||{},leveled,dropped,ms,man,mode,
-    score:api.score,streakMax:api.streak,levelReached:api.level,newRec});
+  renderResult(ex,{ maxStreak, ms, newRec, mode });
 }
 function renderResult(ex,r){
   $('#nav').classList.add('hidden');
   const host=$('#screens');host.innerHTML='';
   const scr=document.createElement('div');
   scr.className='screen active';
-  const accColor=r.acc>=85?'var(--moss)':r.acc>=60?'var(--amber)':'var(--rust)';
   const more=window.__queue.length>0;
-  const li=levelInfo(N.S.neurofit.xp);
-  const inf=r.mode!=='normal';
   scr.innerHTML=`
     <div class="result-hero">
       <div class="tiny" style="margin-bottom:10px">${ex.icon} ${esc(ex.name)}</div>
-      ${inf?`
-        <div class="result-score gold">${r.score}</div>
-        <div class="muted" style="margin-top:8px">${r.mode==='survival'?'очков до ошибки':'очков набрано'}</div>
-        ${r.newRec?`<div style="margin-top:12px"><span class="chip amber">🏆 Новый рекорд!</span></div>`:''}
-      `:`
-        <div class="result-score">+${r.xp} XP</div>
-        <div class="muted" style="margin-top:8px">тренировка завершена</div>
-      `}
+      <div class="result-score gold">${r.maxStreak}</div>
+      <div class="muted" style="margin-top:8px">${r.mode==='survival'?'серия до ошибки':'макс. серия подряд'}</div>
+      ${r.newRec?`<div style="margin-top:12px"><span class="chip amber">🏆 Новый рекорд!</span></div>`:''}
     </div>
     <div class="card" style="padding:22px">
       <div class="result-num-row">
-        <div class="result-num"><b style="color:${accColor}">${r.acc}%</b><span>точность</span></div>
-        ${r.rt?`<div class="result-num-sep"></div>
-        <div class="result-num"><b>${r.rt}<span style="font-size:14px;font-weight:500"> мс</span></b><span>реакция</span></div>`:''}
+        <div class="result-num"><b>${r.maxStreak}</b><span>серия</span></div>
         <div class="result-num-sep"></div>
         <div class="result-num"><b>${Math.round(r.ms/1000)}<span style="font-size:14px;font-weight:500"> с</span></b><span>время</span></div>
       </div>
-    </div>
-    ${Object.keys(r.detail).length?`
-    <div class="card">
-      ${Object.entries(r.detail).map(([k,v])=>`<div class="res-row"><span class="muted">${esc(k)}</span><b>${esc(v)}</b></div>`).join('')}
-    </div>`:''}
-    <div class="card">
-      <div class="between" style="margin-bottom:10px">
-        <span class="tiny">Уровень ${li.level}</span>
-        <span class="tiny">+${r.xp} XP</span>
-      </div>
-      <div class="bar"><i class="on" style="--p:${li.pct.toFixed(3)}"></i></div>
     </div>
     <div style="margin-top:10px">
       ${more?`<button class="btn btn-primary btn-full btn-lg" id="rsNext" type="button">Следующее · ${window.__queue.length}</button>`:''}
@@ -1416,19 +1386,27 @@ function renderResult(ex,r){
   $('#rsHome',scr).onclick=()=>{SFX.tap();window.__queue=[];go('brain');};
 }
 function renderBrain(){
-  const li=levelInfo(N.S.neurofit.xp);
   const cats=['memory','speed','math','logic'];
   const root=document.createElement('div');
   root.className='screen';
+  
+  let bestStreak = 0;
+  Object.keys(N.S.neurofit.records || {}).forEach(exId => {
+    const r = N.S.neurofit.records[exId];
+    ['endless','survival'].forEach(m => {
+      if (r[m] && r[m].score > bestStreak) bestStreak = r[m].score;
+    });
+  });
+
   root.innerHTML=`
     <div class="between" style="margin-bottom:18px">
       <div>
-        <div class="tiny">УРОВЕНЬ ${li.level}</div>
+        <div class="tiny">ТРЕНИРОВКИ</div>
         <div class="h1" style="margin-top:3px">Тренировка мозга</div>
       </div>
       <div class="chip moss" style="padding:8px 14px">🔥 <b>${N.S.neurofit.streak}</b></div>
     </div>
-    <div class="hero" style="background:linear-gradient(155deg,#2A3A2F 0%,#1E2820 62%)">
+    <div class="hero" style="background:var(--hero-bg)">
       <div class="hero-inner">
         <div class="eyebrow">БЫСТРЫЙ СТАРТ</div>
         <div class="lead">Три упражнения подряд</div>
@@ -1438,10 +1416,9 @@ function renderBrain(){
     </div>
     <div class="card">
       <div class="between" style="margin-bottom:10px">
-        <div class="tiny">Уровень ${li.level} · ${li.into}/${li.need} XP</div>
-        <div class="tiny">${N.S.neurofit.totalSessions} сессий</div>
+        <div class="tiny">Всего сессий</div>
+        <div class="tiny">Лучшая серия: <b>${bestStreak}</b></div>
       </div>
-      <div class="bar"><i class="on" style="--p:${li.pct.toFixed(3)}"></i></div>
     </div>
     ${cats.map(cat=>{
       const list=EX_LIST.filter(e=>e.cat===cat);
@@ -1454,12 +1431,18 @@ function renderBrain(){
           const man=(N.S.neurofit.manualDiff[e.id]||0)>0;
           const rec=N.S.neurofit.records[e.id];
           const hr=rec&&(rec.survival||rec.endless);
+          let maxS = 0;
+          if (rec) {
+            if (rec.endless) maxS = Math.max(maxS, rec.endless.score||0);
+            if (rec.survival) maxS = Math.max(maxS, rec.survival.score||0);
+          }
           return `<button class="ex-item" data-ex="${e.id}" type="button">
             <div class="ex-ico">${e.icon}</div>
             <div class="ex-meta">
               <div class="ex-nm">${esc(e.name)} ${hr?'🏆':''}</div>
               <div class="ex-tg"><span>${esc(e.tag)}</span><span class="lvl">· ${LEVEL_NAMES[lvl-1]}${man?' 🎚':''}</span></div>
             </div>
+            ${maxS ? `<div style="margin-right:8px;font-family:'Fraunces',serif;font-size:16px;font-weight:600;color:var(--amber-dim)">${maxS}</div>` : ''}
             <span class="ex-arrow">›</span>
           </button>`;
         }).join('')}
@@ -1474,8 +1457,8 @@ function renderBrain(){
       </div>
       <span class="ex-arrow">›</span>
     </button>
-
     <div style="height:20px"></div>`;
+    
   $('#quickStart',root).onclick=()=>{
     SFX.tap();buzz(10);N.ensureAudio();
     const seed=parseInt(todayKey().split('-').join(''),10);
