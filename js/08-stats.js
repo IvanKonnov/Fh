@@ -1,4 +1,4 @@
-/* ═══ NAVLIFE · STATS · v6.2 (No XP, Reflection back) ═══ */
+/* ═══ NAVLIFE · STATS · v6.3 (Smart Insights) ═══ */
 (function(){
 'use strict';
 const N = window.__nav;
@@ -114,23 +114,76 @@ function collectDailyMetrics(daysBack = 30){
   return out;
 }
 
-function simpleSummaries(){
-  const data = collectDailyMetrics(30);
-  const withSleep = data.filter(x => x.sleep !== null);
-  const withMood = data.filter(x => x.mood !== null);
-  const withWater = data.filter(x => x.water > 0);
-  const withSchedule = data.filter(x => x.scheduleTotal > 0);
-  const withHabits = data.filter(x => x.habitPct !== null && x.habitPct > 0);
-  const withBreath = data.filter(x => x.breathingMin > 0);
+/* ═══ УМНЫЕ ИНСАЙТЫ ═══ */
+function insightSleepTasks(){
+  const data = collectDailyMetrics(30).filter(x => x.sleep !== null && x.schedulePct !== null && x.scheduleTotal >= 3);
+  if (data.length < MIN_TOTAL) return null;
+  const short = data.filter(x => x.sleep < 6.5).map(x => x.schedulePct);
+  const long  = data.filter(x => x.sleep >= 7.5).map(x => x.schedulePct);
+  if (short.length < MIN_GROUP || long.length < MIN_GROUP) return null;
+  const aS = avg(short), aL = avg(long);
+  const diff = aL - aS;
+  if (Math.abs(diff) < 5) return null;
+  const direction = diff > 0 ? 'up' : 'down';
+  const diffPct = Math.round(Math.abs(diff));
+  return {
+    icon: '📋',
+    title: 'Сон и продуктивность',
+    hint: 'Как высыпание влияет на выполнение дел',
+    left:  { label:'Мало сна',  sub:'< 6.5 ч', value:`${Math.round(aS)}`, unit:'%',  days:short.length, pct:aS },
+    right: { label:'Много сна', sub:'≥ 7.5 ч', value:`${Math.round(aL)}`, unit:'%',  days:long.length,  pct:aL },
+    diff:  { value:`${diffPct}%`, direction, label: direction === 'up' ? 'в пользу хорошего сна' : 'в пользу короткого сна' },
+    note: 'Корреляция на основе твоих данных'
+  };
+}
 
-  const out = [];
-  if (withSleep.length >= 2) out.push({ icon:'😴', label:'СОН', value:`${avg(withSleep.map(x => x.sleep)).toFixed(1)} ч`, sub:`${withSleep.length} ${pluralDays(withSleep.length)}` });
-  if (withMood.length >= 2) out.push({ icon:'🙂', label:'НАСТРОЕНИЕ', value:`${avg(withMood.map(x => x.mood)).toFixed(1)}/5`, sub:`${withMood.length} ${pluralDays(withMood.length)}` });
-  if (withWater.length >= 2) out.push({ icon:'💧', label:'ВОДА', value:`${Math.round(avg(withWater.map(x => x.water)))} мл`, sub:`${withWater.length} ${pluralDays(withWater.length)}` });
-  if (withSchedule.length >= 2) out.push({ icon:'📋', label:'ДЕЛА', value:`${Math.round(avg(withSchedule.map(x => x.schedulePct)))}%`, sub:`${withSchedule.length} ${pluralDays(withSchedule.length)}` });
-  if (withHabits.length >= 2) out.push({ icon:'✅', label:'ПРИВЫЧКИ', value:`${Math.round(avg(withHabits.map(x => x.habitPct)))}%`, sub:`${withHabits.length} ${pluralDays(withHabits.length)}` });
-  if (withBreath.length >= 2) { const total = withBreath.reduce((s,x) => s + x.breathingMin, 0); out.push({ icon:'🧘', label:'ДЫХАНИЕ', value:`${total} мин`, sub:`${withBreath.length} ${pluralDays(withBreath.length)}` }); }
-  return out;
+function insightHabitWeekday(){
+  const S = N.S;
+  const habits = S.habits || [];
+  if (!habits.length) return null;
+  
+  const dayNames = ['Воскресенье','Понедельник','Вторник','Среда','Четверг','Пятница','Суббота'];
+  const failCounts = [0,0,0,0,0,0,0];
+  const totalCounts = [0,0,0,0,0,0,0];
+  
+  const today = new Date();
+  for (let i = 0; i < 30; i++) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const ds = fmtDate(d);
+    const dow = d.getDay();
+    habits.forEach(h => {
+      const created = h.createdAt || '2000-01-01';
+      if (created > ds) return;
+      totalCounts[dow]++;
+      if (((h.log||{})[ds] || 0) < (h.target || 1)) failCounts[dow]++;
+    });
+  }
+  
+  let worstDay = -1, maxFailPct = 0;
+  for (let i = 0; i < 7; i++) {
+    if (totalCounts[i] >= 3) {
+      const pct = Math.round(failCounts[i] / totalCounts[i] * 100);
+      if (pct > maxFailPct) { maxFailPct = pct; worstDay = i; }
+    }
+  }
+  
+  if (worstDay === -1 || maxFailPct < 40) return null;
+  
+  return {
+    icon: '📅',
+    title: 'День недели',
+    hint: 'Статистика пропусков',
+    highlight: {
+      value: `${dayNames[worstDay]}`,
+      sub: `Пропущено ${maxFailPct}% привычек`
+    },
+    extra: {
+      icon: '💡',
+      text: `Попробуй ставить напоминания на этот день или перенести сложные привычки на выходные.`,
+      neutral: true
+    },
+    note: 'Анализ за последние 30 дней'
+  };
 }
 
 function renderInsightCard(ins){
@@ -343,7 +396,10 @@ function renderStats(){
   const avgAcc = last.length ? Math.round(last.reduce((a, b) => a + (b.acc || 0), 0) / last.length) : 0;
   const mins = Math.round(S.neurofit.totalMs / 60000);
 
-  const summaries = simpleSummaries();
+  const insights = [
+    insightSleepTasks(),
+    insightHabitWeekday()
+  ].filter(Boolean);
 
   const root = document.createElement('div');
   root.className = 'screen';
@@ -366,6 +422,16 @@ function renderStats(){
     </div>
 
     ${renderRadarChart(radarData)}
+
+    ${insights.length ? `
+      <div class="observations-hero">
+        <div class="oh-eyebrow">🔍 УМНЫЕ НАБЛЮДЕНИЯ</div>
+        <div class="oh-title">Закономерности в данных</div>
+        <div class="oh-sub">Сравнение двух ситуаций на твоих записях. Это корреляция — не диагноз.</div>
+      </div>
+      ${insights.map(ins => renderInsightCard(ins)).join('')}
+    ` : ''}
+
     ${renderSeniorComparison()}
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
@@ -380,21 +446,6 @@ function renderStats(){
         <div class="tiny" style="margin-top:4px">РЕКОРД СЕРИИ</div>
       </div>
     </div>
-
-    ${summaries.length ? `
-      <div class="summary-hero">
-        <div class="sh-title">📊 Твои средние</div>
-        <div class="summary-grid">
-          ${summaries.map(s => `
-            <div class="summary-item">
-              <div class="si-label"><span>${s.icon}</span><span>${esc(s.label)}</span></div>
-              <div class="si-value">${esc(s.value)}</div>
-              <div class="si-sub">${esc(s.sub)}</div>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-    ` : ''}
 
     <div id="stats-reflection-slot"></div>
     <div id="stats-achievements-slot"></div>

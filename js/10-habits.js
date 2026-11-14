@@ -1,4 +1,4 @@
-/* ═══ NAVLIFE · HABITS · v2.1 (Smart Empty) ═══ */
+/* ═══ NAVLIFE · HABITS · v2.3 (Fixed Heatmap) ═══ */
 (function(){
 'use strict';
 const N = window.__nav;
@@ -83,6 +83,145 @@ function bindHomeCard(){
   }
 }
 
+/* ═══ HEATMAP МОДАЛКА ═══ */
+function openHeatmap(h){
+  const target = Number(h.target) || 1;
+  const end = new Date();
+  end.setHours(23, 59, 59, 999); // Конец сегодняшнего дня
+  
+  const start = new Date(); start.setDate(end.getDate() - 364);
+  start.setHours(12, 0, 0, 0); // Полдень, чтобы избежать проблем с переходом на летнее время
+  
+  // Выравниваем начало на понедельник
+  const startDow = (start.getDay() + 6) % 7;
+  start.setDate(start.getDate() - startDow);
+
+  const weeks = [];
+  const monthLabels = [];
+  let cur = new Date(start);
+  let lastMonth = -1;
+
+  while (cur <= end) {
+    let monthName = null;
+    if (cur.getMonth() !== lastMonth) {
+      monthName = cur.toLocaleString('ru-RU', { month: 'short' });
+      lastMonth = cur.getMonth();
+    }
+    monthLabels.push(monthName);
+
+    const week = [];
+    for (let i = 0; i < 7; i++) {
+      if (cur > end) {
+        week.push(null);
+      } else {
+        const k = fmtDate(cur);
+        const val = Number((h.log||{})[k] || 0);
+        let level = 0;
+        if (val > 0) {
+          if (val >= target) level = 4;
+          else if (val >= target * 0.75) level = 3;
+          else if (val >= target * 0.5) level = 2;
+          else level = 1;
+        }
+        const isToday = k === todayKey();
+        week.push({ date: k, val, level, isToday });
+      }
+      cur.setDate(cur.getDate() + 1);
+    }
+    weeks.push(week);
+  }
+
+  // Сделал цвета более насыщенными, чтобы их было видно на любом фоне
+  const colors = [
+    'var(--line-soft)',
+    'rgba(63, 97, 82, 0.4)',
+    'rgba(63, 97, 82, 0.6)',
+    'rgba(63, 97, 82, 0.8)',
+    'var(--moss)'
+  ];
+
+  const gridHtml = weeks.map(week => `
+    <div style="display:flex;flex-direction:column;gap:3px">
+      ${week.map(day => {
+        if (!day) return `<div style="width:12px;height:12px"></div>`;
+        const levelColor = colors[day.level];
+        const border = day.isToday ? '2px solid var(--amber)' : '1px solid rgba(0,0,0,0.05)';
+        return `<div title="${day.date} (${day.val}/${target})" style="width:12px;height:12px;border-radius:2px;background:${levelColor};border:${border}"></div>`;
+      }).join('')}
+    </div>
+  `).join('');
+
+  const totalDays = Object.values(h.log || {}).filter(v => Number(v) >= target).length;
+
+  openModal(`
+    <div class="modal-handle"></div>
+    <div class="between" style="margin-bottom:16px">
+      <div>
+        <div class="h2">${h.emoji || '✅'} ${esc(h.title)}</div>
+        <div class="muted" style="font-size:13px;margin-top:2px">Карта прогресса за год</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-family:'Fraunces',serif;font-size:24px;font-weight:600;color:var(--moss)">${totalDays}</div>
+        <div class="tiny" style="font-size:10px">ДНЕЙ ВЫПОЛНЕНО</div>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:6px; align-items:flex-start; margin-bottom:16px">
+      <!-- Дни недели -->
+      <div style="display:flex; flex-direction:column; gap:3px; margin-top: 16px; font-size: 9px; color: var(--ink-mute); text-align: right; flex-shrink:0">
+        <div style="height:12px; line-height:12px">Пн</div>
+        <div style="height:12px; line-height:12px"></div>
+        <div style="height:12px; line-height:12px">Ср</div>
+        <div style="height:12px; line-height:12px"></div>
+        <div style="height:12px; line-height:12px">Пт</div>
+        <div style="height:12px; line-height:12px"></div>
+        <div style="height:12px; line-height:12px">Вс</div>
+      </div>
+
+      <div style="flex:1; overflow:hidden">
+        <!-- Месяцы -->
+        <div style="display:flex; gap:3px; margin-bottom:4px; height: 12px;">
+          ${monthLabels.map(m => `<div style="width:12px; position:relative; font-size:9px; color:var(--ink-mute); white-space:nowrap">${m ? `<span style="position:absolute; left:0; top:0">${m}</span>` : ''}</div>`).join('')}
+        </div>
+
+        <!-- Сетка -->
+        <div id="heatmap-scroll" style="overflow-x:auto; padding-bottom:8px;">
+          <div style="display:flex; gap:3px; width:fit-content;">
+            ${gridHtml}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--ink-mute);margin-bottom:20px; padding-left:24px">
+      <div style="display:flex;gap:4px;align-items:center">
+        <span>Меньше</span>
+        ${colors.map(c => `<div style="width:10px;height:10px;border-radius:2px;background:${c}"></div>`).join('')}
+        <span>Больше</span>
+      </div>
+      <span style="color:var(--amber);font-weight:600">Обведён — сегодня</span>
+    </div>
+
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-ghost btn-full" id="hmClose" type="button">Закрыть</button>
+      <button class="btn btn-primary btn-full" id="hmEdit" type="button">Изменить</button>
+    </div>
+  `, m => {
+    m.querySelector('#hmClose').onclick = () => closeModal(m);
+    m.querySelector('#hmEdit').onclick = () => {
+      closeModal(m);
+      setTimeout(() => openEditModal(h.id), 150);
+    };
+    
+    // Скролл вправо, к сегодняшнему дню
+    setTimeout(() => {
+      const scroller = document.getElementById('heatmap-scroll');
+      if (scroller) scroller.scrollLeft = scroller.scrollWidth;
+    }, 100);
+  });
+}
+
+/* ═══ ГЛАВНЫЙ ЭКРАН ═══ */
 function renderHabits(){
   const habits = list();
   const root = document.createElement('div');
@@ -100,16 +239,16 @@ function renderHabits(){
       <button class="btn btn-primary btn-sm" id="addHabit" type="button">+ Привычка</button>
     </div>
 
-    <div class="card" style="background:linear-gradient(155deg,#22302A 0%,#1B211D 62%);color:#F4F2EA">
+    <div class="card" style="background:var(--hero-bg);color:var(--hero-text)">
       <div class="between" style="align-items:flex-end">
         <div>
-          <div class="tiny" style="color:#F3E3C8;letter-spacing:.14em">СЕГОДНЯ</div>
-          <div style="font-family:'Fraunces',serif;font-size:38px;font-weight:600;color:#F3E3C8;line-height:1;margin-top:6px">${doneToday} / ${habits.length}</div>
-          <div style="font-size:12.5px;color:#C7CEC5;margin-top:6px">выполнено</div>
+          <div class="tiny" style="color:var(--amber-soft);letter-spacing:.14em">СЕГОДНЯ</div>
+          <div style="font-family:'Fraunces',serif;font-size:38px;font-weight:600;color:var(--amber-soft);line-height:1;margin-top:6px">${doneToday} / ${habits.length}</div>
+          <div style="font-size:12.5px;color:var(--hero-text-dim);margin-top:6px">выполнено</div>
         </div>
         <div style="text-align:right">
-          <div class="tiny" style="color:#9AA398;letter-spacing:.14em">СУММА СЕРИЙ</div>
-          <div style="font-family:'Fraunces',serif;font-size:26px;font-weight:600;color:#F3E3C8;line-height:1;margin-top:6px">🔥 ${totalStreaks}</div>
+          <div class="tiny" style="color:var(--hero-text-mute);letter-spacing:.14em">СУММА СЕРИЙ</div>
+          <div style="font-family:'Fraunces',serif;font-size:26px;font-weight:600;color:var(--amber-soft);line-height:1;margin-top:6px">🔥 ${totalStreaks}</div>
         </div>
       </div>
     </div>
@@ -145,12 +284,19 @@ function renderHabits(){
 
   root.addEventListener('click', e => {
     const card = e.target.closest('[data-habit-id]');
-    if (card && !e.target.closest('[data-edit-habit]')){
+    if (card && !e.target.closest('[data-edit-habit]') && !e.target.closest('[data-heatmap]')){
       toggle(card.dataset.habitId);
       return;
     }
     const ed = e.target.closest('[data-edit-habit]');
-    if (ed){ e.stopPropagation(); openEditModal(ed.dataset.editHabit); }
+    if (ed){ e.stopPropagation(); openEditModal(ed.dataset.editHabit); return; }
+    
+    const hm = e.target.closest('[data-heatmap]');
+    if (hm){
+      e.stopPropagation();
+      const h = findBy(hm.dataset.heatmap);
+      if (h) openHeatmap(h);
+    }
   });
 
   return root;
@@ -171,7 +317,10 @@ function habitCardHtml(h){
           <div class="habit-card__title">${esc(h.title)}</div>
           <div class="habit-card__sub">${done ? '✓ сегодня' : `Осталось ${target - cur}`}</div>
         </div>
-        <button class="icon-btn" data-edit-habit="${h.id}" type="button" style="width:26px;height:26px;font-size:11px;background:transparent;border-color:transparent;color:var(--ink-mute)">✎</button>
+        <div style="display:flex;gap:4px">
+          <button class="icon-btn" data-heatmap="${h.id}" type="button" title="Карта прогресса" style="width:26px;height:26px;font-size:11px;background:transparent;border-color:transparent;color:var(--moss)">📊</button>
+          <button class="icon-btn" data-edit-habit="${h.id}" type="button" style="width:26px;height:26px;font-size:11px;background:transparent;border-color:transparent;color:var(--ink-mute)">✎</button>
+        </div>
       </div>
       <div class="habit-dots">
         ${week.map(w => `<div class="habit-dot ${w.done?'on':''} ${w.isToday?'today':''}" title="${w.date}"></div>`).join('')}
@@ -342,7 +491,7 @@ function seedDefault(){
 
 window.Habits = {
   list, findBy, isDone, streakOf, bestStreak, weekStatus,
-  toggle, homeCard, bindHomeCard, seedDefault, openEditModal
+  toggle, homeCard, bindHomeCard, seedDefault, openEditModal, openHeatmap
 };
 window.App.registerScreen('habits', renderHabits);
 })();

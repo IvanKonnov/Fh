@@ -1,4 +1,4 @@
-/* ═══ NAVLIFE · NUTRITION · v4.6 · One-time Custom Food ═══ */
+/* ═══ NAVLIFE · NUTRITION · v4.8 · Custom Food Tags ═══ */
 (function(){
 'use strict';
 const N = window.__nav;
@@ -259,6 +259,91 @@ function macroPct(totals){
   return { p: Math.round(kP/sum*100), f: Math.round(kF/sum*100), c: Math.round(kC/sum*100) };
 }
 
+/* ═══ УМНЫЙ АНАЛИЗ ПИТАНИЯ ═══ */
+function renderSmartAnalysis(d) {
+  let kcal = 0, healthy = 0, junk = 0;
+  let mealKcal = { breakfast:0, lunch:0, dinner:0, snack:0 };
+  
+  ['breakfast','lunch','dinner','snack'].forEach(m => {
+    (d.meals[m] || []).forEach(it => {
+      const k = (it.grams || 100) / 100;
+      const kCal = (it.kcal || 0) * k;
+      kcal += kCal;
+      mealKcal[m] += kCal;
+      
+      if (it.tag === 'healthy') healthy += kCal;
+      else if (it.tag === 'junk') junk += kCal;
+    });
+  });
+
+  if (kcal === 0) return '';
+
+  const neutral = Math.max(0, kcal - healthy - junk);
+  const hPct = Math.round(healthy / kcal * 100);
+  const jPct = Math.round(junk / kcal * 100);
+  const nPct = 100 - hPct - jPct;
+
+  const targets = { breakfast: 30, lunch: 35, dinner: 25, snack: 10 };
+  const maxKcal = Math.max(1, ...Object.values(mealKcal));
+  
+  let advice = 'Рацион сбалансирован. Так держать!';
+  const hour = new Date().getHours();
+  
+  if (jPct > 20) advice = 'Многовато «мусорной» еды. Попробуй заменить её на фрукты или орехи.';
+  else if (hPct < 30) advice = 'Мало овощей и белка. Добавь зелени в следующий приём.';
+  else if (hour < 12 && mealKcal.breakfast < targets.breakfast * 0.5) advice = 'Утром нужно больше энергии (углеводов).';
+  else if (hour >= 18 && mealKcal.dinner > targets.dinner * 1.5) advice = 'На ночь лучше есть меньше. Желудок скажет спасибо.';
+  else if (hour >= 18 && mealKcal.snack > 300) advice = 'Поздний перекус может помешать сну.';
+
+  const mealNames = { breakfast: 'Завтрак', lunch: 'Обед', dinner: 'Ужин', snack: 'Перекус' };
+
+  return `
+    <div class="card" style="margin-bottom:14px">
+      <div class="h3" style="font-family:'Fraunces',serif;font-size:16px;margin-bottom:12px">Умный анализ</div>
+      
+      <!-- Качество -->
+      <div style="margin-bottom:14px">
+        <div class="between" style="margin-bottom:6px">
+          <span class="tiny" style="font-size:10.5px;letter-spacing:.06em">КАЧЕСТВО РАЦИОНА</span>
+          <span class="tiny" style="font-size:10.5px">${hPct}% полезно</span>
+        </div>
+        <div style="display:flex;height:8px;border-radius:4px;overflow:hidden;background:var(--line-soft)">
+          <div style="width:${hPct}%;background:var(--moss)" title="Полезное"></div>
+          <div style="width:${nPct}%;background:var(--amber)" title="Нейтральное"></div>
+          <div style="width:${jPct}%;background:var(--rust)" title="Мусор"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:10px;color:var(--ink-soft)">
+          <span style="color:var(--moss);font-weight:600">● Полезно</span>
+          <span style="color:var(--amber);font-weight:600">● Нейтрально</span>
+          <span style="color:var(--rust);font-weight:600">● Мусор</span>
+        </div>
+      </div>
+
+      <!-- Распределение -->
+      <div style="margin-bottom:14px">
+        <div class="tiny" style="font-size:10.5px;letter-spacing:.06em;margin-bottom:6px">РАСПРЕДЕЛЕНИЕ</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:4px">
+          ${Object.keys(mealKcal).map(m => {
+            const val = mealKcal[m];
+            const pct = Math.round(val / Math.max(1, kcal) * 100);
+            return `<div style="text-align:center">
+              <div style="font-size:11px;font-weight:600;color:var(--ink)">${mealNames[m].slice(0, 2)}</div>
+              <div style="height:40px;background:var(--paper);border-radius:4px;margin-top:4px;position:relative;display:flex;align-items:flex-end;justify-content:center">
+                 <div style="width:100%;height:${Math.min(100, val/maxKcal*100)}%;background:var(--moss-soft);border-radius:4px"></div>
+              </div>
+              <div style="font-size:9px;color:var(--ink-mute);margin-top:4px">${pct}%</div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+
+      <div style="padding:12px 14px;background:var(--amber-soft);border-radius:10px;font-size:12.5px;line-height:1.5;color:var(--amber-dim)">
+        💡 <b>Совет:</b> ${advice}
+      </div>
+    </div>
+  `;
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    ГЛАВНЫЙ ЭКРАН
    ═══════════════════════════════════════════════════════════════════ */
@@ -335,6 +420,8 @@ function renderNutrition(){
           </div>`).join('')}
       </div>
     </div></div>
+
+    ${renderSmartAnalysis(d)}
 
     <div class="water-card">
       <div class="water-head">
@@ -434,9 +521,10 @@ function renderNutrition(){
               const grams = it.grams !== undefined ? it.grams : 100;
               const k = grams / 100;
               const isJunk = it.tag === 'junk';
+              const isHealthy = it.tag === 'healthy';
               const tagBadge = isJunk
                 ? '<span style="display:inline-block;font-size:9.5px;padding:1px 6px;border-radius:6px;background:rgba(164,80,58,.12);color:var(--rust);font-weight:600;margin-left:4px">не особо</span>'
-                : (it.tag === 'healthy' ? '<span style="display:inline-block;font-size:9.5px;padding:1px 6px;border-radius:6px;background:var(--moss-soft);color:var(--moss);font-weight:600;margin-left:4px">полезно</span>' : '');
+                : (isHealthy ? '<span style="display:inline-block;font-size:9.5px;padding:1px 6px;border-radius:6px;background:var(--moss-soft);color:var(--moss);font-weight:600;margin-left:4px">полезно</span>' : '');
               return `
               <div class="food-row" style="flex-wrap:wrap">
                 <div class="food-row-main" style="width:100%">
@@ -1118,6 +1206,7 @@ function openAddFoodModal(mealId, ds){
   const allFoods = [...FOOD_DB, ...(N.S.nutrition.myFoods || [])];
   let activeCat = 'all';
   let activeTier = 'any';
+  let cfTag = 'healthy'; // По умолчанию полезно
 
   openModal(`
     <div class="modal-handle"></div>
@@ -1156,10 +1245,20 @@ function openAddFoodModal(mealId, ds){
       </div>
       <div class="field"><label>Граммы</label><input id="cfGrams" type="number" value="100" min="1"></div>
       
+      <!-- Выбор полезности -->
+      <div class="field">
+        <label>Полезность</label>
+        <div style="display:flex;gap:6px;margin-top:6px" id="cfTags">
+           <button type="button" data-tag="healthy" class="food-tab on" style="flex:1;background:var(--moss);color:#fff;border-color:var(--moss)">🥗 Полезно</button>
+           <button type="button" data-tag="neutral" class="food-tab" style="flex:1">⚖️ Обычное</button>
+           <button type="button" data-tag="junk" class="food-tab" style="flex:1">🍔 Вредно</button>
+        </div>
+      </div>
+
       <div class="field" style="margin-bottom:16px">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0">
           <input type="checkbox" id="cfSaveToDb" checked style="width:18px;height:18px;accent-color:var(--moss)">
-          <span style="font-size:13px">Сохранить в базу</span>
+          <span style="font-size:13px">Сохранить в мою базу</span>
         </label>
       </div>
 
@@ -1256,6 +1355,18 @@ function openAddFoodModal(mealId, ds){
       m.querySelector('#tab-custom').style.display = b.dataset.tab === 'custom' ? 'block' : 'none';
     });
     m.querySelector('#afCancel').onclick = () => closeModal(m);
+    
+    // Обработка выбора тега для своего продукта
+    m.querySelectorAll('#cfTags [data-tag]').forEach(b => b.onclick = () => {
+      cfTag = b.dataset.tag;
+      m.querySelectorAll('#cfTags [data-tag]').forEach(x => {
+        const on = x.dataset.tag === cfTag;
+        x.style.background = on ? 'var(--moss)' : 'var(--paper)';
+        x.style.color = on ? '#fff' : 'var(--ink-soft)';
+        x.style.borderColor = on ? 'var(--moss)' : 'var(--line)';
+      });
+    });
+
     m.querySelector('#afAdd').onclick = () => {
       if (!selectedFood) return;
       const day = N.S.nutrition.days[addFoodTarget.ds];
@@ -1281,11 +1392,11 @@ function openAddFoodModal(mealId, ds){
       const saveToDb = m.querySelector('#cfSaveToDb').checked;
       if (saveToDb) {
         if (!N.S.nutrition.myFoods) N.S.nutrition.myFoods = [];
-        N.S.nutrition.myFoods.push({ n, kcal, p, f, c, tag:'neutral', tier:'standard' });
+        N.S.nutrition.myFoods.push({ n, kcal, p, f, c, tag: cfTag, tier:'standard' });
       }
       
       const day = N.S.nutrition.days[addFoodTarget.ds];
-      day.meals[addFoodTarget.mealId].push({ n, grams: g, kcal, p, f, c, tag:'neutral', tier:'standard' });
+      day.meals[addFoodTarget.mealId].push({ n, grams: g, kcal, p, f, c, tag: cfTag, tier:'standard' });
       saveState(); closeModal(m); go('nutrition');
       toast(`Добавлено: ${n} ${g}г`);
     };
